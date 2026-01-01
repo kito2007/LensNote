@@ -5,22 +5,37 @@
 //  Created by 박태영 on 12/29/25.
 //
 
-import Combine
-import Foundation
+import SwiftUI
 
-@MainActor
-final class CameraView: ObservableObject {
-    var objectWillChange: ObservableObjectPublisher
-    
-    @Published var statusText: String = "카메라 준비 중..."
+struct CameraView: View {
 
-    private let savePhotoUseCase: SavePhotoUseCase
+    @StateObject private var viewModel: CameraViewModel
 
-    init(savePhotoUseCase: SavePhotoUseCase) {
-        self.savePhotoUseCase = savePhotoUseCase
+    init(viewModel: CameraViewModel) {
+        _viewModel = StateObject(wrappedValue: viewModel)
     }
 
-    func onAppear() {
-        statusText = "스타일 적용됨"
+    var body: some View {
+        VStack(spacing: 16) {
+            Text("Camera (MVP)")
+                .font(.title)
+
+            Button("Mock Capture & Save") {
+                viewModel.mockCaptureAndSave()
+            }
+
+            if let saved = viewModel.lastSaved {
+                Text("Saved: \(saved.id.uuidString)")
+                    .font(.footnote)
+            }
+
+            if let err = viewModel.errorMessage {
+                Text("Error: \(err)")
+                    .foregroundStyle(.red)
+                    .font(.footnote)
+            }
+        }
+        .padding()
     }
 }
+

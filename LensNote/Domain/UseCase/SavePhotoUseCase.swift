@@ -7,15 +7,18 @@
 
 import Foundation
 
-final class SavePhotoUseCase {
+struct SavePhotoUseCase {
 
-    private let repository: PhotoRepositoryProtocol
+    let repository: PhotoRepositoryProtocol
 
-    init(repository: PhotoRepositoryProtocol) {
-        self.repository = repository
-    }
-
-    func execute(photo: PhotoItem) throws {
-        try repository.save(photo: photo)
+    func execute(imagePath: String, coordinate: GeoCoordinate?) throws -> PhotoItem {
+        let item = PhotoItem(
+            id: UUID(),
+            createdAt: Date(),
+            imagePath: imagePath,
+            coordinate: coordinate
+        )
+        try repository.save(photo: item)
+        return item
     }
 }

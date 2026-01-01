@@ -5,17 +5,19 @@
 //  Created by 박태영 on 12/29/25.
 //
 
+// LensNote/Domain/Repositories/LocalPhotoRepository.swift
+
 import Foundation
 
 final class LocalPhotoRepository: PhotoRepositoryProtocol {
 
-    private var storage: [PhotoItem] = []
+    private var items: [PhotoItem] = []
 
-    func save(photo: PhotoItem) throws {
-        storage.append(photo)
+    func save(photo item: PhotoItem) throws {
+        items.append(item)
     }
 
     func fetchAll() throws -> [PhotoItem] {
-        storage
+        items
     }
 }

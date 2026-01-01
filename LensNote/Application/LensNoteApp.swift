@@ -10,19 +10,14 @@ import SwiftUI
 @main
 struct LensNoteApp: App {
 
-    let photoRepository = LocalPhotoRepository()
+    private let photoRepository = LocalPhotoRepository()
 
     var body: some Scene {
         WindowGroup {
-
-            let savePhotoUseCase = SavePhotoUseCase(
-                repository: photoRepository
-            )
+            let savePhotoUseCase = SavePhotoUseCase(repository: photoRepository)
 
             CameraView(
-                savePhotoUseCase: CameraViewModel(
-                    savePhotoUseCase: savePhotoUseCase
-                )
+                viewModel: CameraViewModel(savePhotoUseCase: savePhotoUseCase)
             )
         }
     }
