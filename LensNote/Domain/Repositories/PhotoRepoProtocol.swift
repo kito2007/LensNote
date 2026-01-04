@@ -8,6 +8,6 @@
 import Foundation
 
 protocol PhotoRepositoryProtocol {
-    func save(photo: PhotoItem) throws
+    func save(_ item: PhotoItem) throws
     func fetchAll() throws -> [PhotoItem]
 }

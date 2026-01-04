@@ -13,7 +13,7 @@ final class LocalPhotoRepository: PhotoRepositoryProtocol {
 
     private var items: [PhotoItem] = []
 
-    func save(photo item: PhotoItem) throws {
+    func save(_ item: PhotoItem) throws {
         items.append(item)
     }
 

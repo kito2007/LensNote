@@ -8,7 +8,6 @@
 import Foundation
 
 struct SavePhotoUseCase {
-
     let repository: PhotoRepositoryProtocol
 
     func execute(imagePath: String, coordinate: GeoCoordinate?) throws -> PhotoItem {
@@ -18,7 +17,7 @@ struct SavePhotoUseCase {
             imagePath: imagePath,
             coordinate: coordinate
         )
-        try repository.save(photo: item)
+        try repository.save(item)
         return item
     }
 }
