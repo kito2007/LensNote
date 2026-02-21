@@ -10,6 +10,7 @@ import SwiftUI
 struct RootView: View {
     let cameraVM: CameraViewModel
     let galleryVM: GalleryViewModel
+    @StateObject private var mapVM = MapViewModel()
 
     var body: some View {
         TabView {
@@ -18,6 +19,15 @@ struct RootView: View {
 
             GalleryView(viewModel: galleryVM)
                 .tabItem { Label("Gallery", systemImage: "photo.on.rectangle") }
+
+            MapView(viewModel: mapVM)
+                .tabItem { Label("Map", systemImage: "map") }
+        }
+        .onAppear {
+            Task {
+                try? await Task.sleep(nanoseconds: 300_000_000)
+                await mapVM.loadPhotoPinsIfNeeded()
+            }
         }
     }
 }
