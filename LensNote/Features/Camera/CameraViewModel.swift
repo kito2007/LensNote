@@ -11,6 +11,7 @@ import Foundation
 import Combine
 import AVFoundation
 import Vision
+import UIKit
 
 struct FilterPreset: Equatable {
     let name: String
@@ -32,14 +33,18 @@ final class CameraViewModel: NSObject, ObservableObject {
     @Published var preset: FilterPreset? = nil
     @Published var guidanceMessage: String = "컨셉을 입력하면 구도 안내를 시작해요."
     @Published var isCameraAuthorized: Bool? = nil
+    @Published var isCapturingPhoto: Bool = false
+    @Published var cameraStatusMessage: String? = nil
 
     let session = AVCaptureSession()
 
     private let sessionQueue = DispatchQueue(label: "CameraSessionQueue")
     private let sampleBufferQueue = DispatchQueue(label: "CameraSampleBufferQueue")
     private let videoOutput = AVCaptureVideoDataOutput()
+    private let photoOutput = AVCapturePhotoOutput()
     private nonisolated(unsafe) var lastAnalysisTime = Date.distantPast
     private nonisolated let analysisInterval: TimeInterval = 0.2
+    private nonisolated(unsafe) var photoCaptureContinuation: CheckedContinuation<UIImage?, Never>?
     private var isSessionConfigured = false
     private var isRunning = false
 
@@ -59,8 +64,10 @@ final class CameraViewModel: NSObject, ObservableObject {
         isCameraAuthorized = granted
         guard granted else {
             guidanceMessage = "카메라 권한이 필요해요."
+            cameraStatusMessage = "카메라 권한이 꺼져 있어요. 설정에서 권한을 허용해주세요."
             return
         }
+        cameraStatusMessage = nil
 
         await configureSessionIfNeeded()
         sessionQueue.async { [weak self] in
@@ -98,6 +105,51 @@ final class CameraViewModel: NSObject, ObservableObject {
         }
     }
 
+    func capturePhoto() async -> UIImage? {
+        guard isCameraAuthorized == true else { return nil }
+        guard !isCapturingPhoto else { return nil }
+        guard isSessionConfigured, isRunning else { return nil }
+        guard let connection = photoOutput.connection(with: .video), connection.isEnabled else {
+            errorMessage = "카메라 연결이 준비되지 않았어요. 잠시 후 다시 시도해주세요."
+            return nil
+        }
+
+        isCapturingPhoto = true
+        return await withCheckedContinuation { continuation in
+            photoCaptureContinuation = continuation
+            let settings = AVCapturePhotoSettings()
+            if photoOutput.availablePhotoCodecTypes.contains(.jpeg) {
+                switch photoOutput.maxPhotoQualityPrioritization {
+                case .quality:
+                    settings.photoQualityPrioritization = .quality
+                case .balanced:
+                    settings.photoQualityPrioritization = .balanced
+                case .speed:
+                    settings.photoQualityPrioritization = .speed
+                @unknown default:
+                    settings.photoQualityPrioritization = .balanced
+                }
+            }
+            settings.flashMode = .off
+
+            sessionQueue.async { [weak self] in
+                guard let self else { return }
+                self.photoOutput.capturePhoto(with: settings, delegate: self)
+            }
+        }
+    }
+
+    func saveCapturedImage(_ image: UIImage, coordinate: GeoCoordinate? = nil) {
+        do {
+            let filePath = try persistImageToDocuments(image)
+            let saved = try savePhotoUseCase.execute(imagePath: filePath, coordinate: coordinate)
+            lastSaved = saved
+            errorMessage = nil
+        } catch {
+            errorMessage = String(describing: error)
+        }
+    }
+
     private func requestCameraAccess() async -> Bool {
         let status = AVCaptureDevice.authorizationStatus(for: .video)
         switch status {
@@ -127,10 +179,19 @@ final class CameraViewModel: NSObject, ObservableObject {
                 self.session.beginConfiguration()
                 self.session.sessionPreset = .photo
 
-                if let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back),
+                let candidateDevices: [AVCaptureDevice?] = [
+                    AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back),
+                    AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .front),
+                    AVCaptureDevice.default(for: .video)
+                ]
+                if let device = candidateDevices.compactMap({ $0 }).first,
                    let input = try? AVCaptureDeviceInput(device: device),
                    self.session.canAddInput(input) {
                     self.session.addInput(input)
+                } else {
+                    Task { @MainActor in
+                        self.cameraStatusMessage = "카메라 입력을 구성할 수 없어요. 기기/권한 상태를 확인해주세요."
+                    }
                 }
 
                 self.videoOutput.alwaysDiscardsLateVideoFrames = true
@@ -141,10 +202,26 @@ final class CameraViewModel: NSObject, ObservableObject {
 
                 if self.session.canAddOutput(self.videoOutput) {
                     self.session.addOutput(self.videoOutput)
+                } else {
+                    Task { @MainActor in
+                        self.cameraStatusMessage = "비디오 출력을 구성할 수 없어요."
+                    }
+                }
+
+                if self.session.canAddOutput(self.photoOutput) {
+                    self.session.addOutput(self.photoOutput)
+                } else {
+                    Task { @MainActor in
+                        self.cameraStatusMessage = "사진 출력을 구성할 수 없어요."
+                    }
                 }
 
                 if let connection = self.videoOutput.connection(with: .video) {
                     connection.videoOrientation = .portrait
+                }
+
+                if let photoConnection = self.photoOutput.connection(with: .video) {
+                    photoConnection.videoOrientation = .portrait
                 }
 
                 self.session.commitConfiguration()
@@ -198,6 +275,17 @@ final class CameraViewModel: NSObject, ObservableObject {
             guidanceMessage = "좋아요! 지금 구도 유지"
         }
     }
+
+    private func persistImageToDocuments(_ image: UIImage) throws -> String {
+        guard let data = image.jpegData(compressionQuality: 0.92) else {
+            throw NSError(domain: "CameraViewModel", code: -1, userInfo: [NSLocalizedDescriptionKey: "이미지 인코딩 실패"])
+        }
+        let fileName = "photo_\(UUID().uuidString).jpg"
+        let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
+        let fileURL = (documents ?? FileManager.default.temporaryDirectory).appendingPathComponent(fileName)
+        try data.write(to: fileURL, options: .atomic)
+        return fileURL.path
+    }
 }
 
 extension CameraViewModel: AVCaptureVideoDataOutputSampleBufferDelegate {
@@ -236,3 +324,28 @@ extension CameraViewModel: AVCaptureVideoDataOutputSampleBufferDelegate {
     }
 }
 
+extension CameraViewModel: AVCapturePhotoCaptureDelegate {
+    nonisolated func photoOutput(
+        _ output: AVCapturePhotoOutput,
+        didFinishProcessingPhoto photo: AVCapturePhoto,
+        error: Error?
+    ) {
+        let continuation = photoCaptureContinuation
+        photoCaptureContinuation = nil
+
+        Task { @MainActor in
+            self.isCapturingPhoto = false
+        }
+
+        guard error == nil,
+              let data = photo.fileDataRepresentation(),
+              let image = UIImage(data: data) else {
+            Task { @MainActor in
+                self.errorMessage = error?.localizedDescription ?? "사진 캡처에 실패했어요."
+            }
+            continuation?.resume(returning: nil)
+            return
+        }
+        continuation?.resume(returning: image)
+    }
+}
