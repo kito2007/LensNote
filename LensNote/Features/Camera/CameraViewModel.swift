@@ -10,7 +10,6 @@
 import Foundation
 import Combine
 import AVFoundation
-import Vision
 import UIKit
 
 struct FilterPreset: Equatable {
@@ -42,8 +41,7 @@ final class CameraViewModel: NSObject, ObservableObject {
     private let sampleBufferQueue = DispatchQueue(label: "CameraSampleBufferQueue")
     private let videoOutput = AVCaptureVideoDataOutput()
     private let photoOutput = AVCapturePhotoOutput()
-    private nonisolated(unsafe) var lastAnalysisTime = Date.distantPast
-    private nonisolated let analysisInterval: TimeInterval = 0.2
+    private nonisolated(unsafe) let guidanceEngine = CompositionGuidanceEngine()
     private nonisolated(unsafe) var photoCaptureContinuation: CheckedContinuation<UIImage?, Never>?
     private var isSessionConfigured = false
     private var isRunning = false
@@ -55,6 +53,7 @@ final class CameraViewModel: NSObject, ObservableObject {
 
     func applyConcept() {
         preset = presetForConcept(conceptText)
+        guidanceEngine.updateSceneHint(from: conceptText)
     }
 
     func startSessionIfNeeded() async {
@@ -68,6 +67,7 @@ final class CameraViewModel: NSObject, ObservableObject {
             return
         }
         cameraStatusMessage = nil
+        guidanceEngine.updateSceneHint(from: conceptText)
 
         await configureSessionIfNeeded()
         sessionQueue.async { [weak self] in
@@ -248,34 +248,6 @@ final class CameraViewModel: NSObject, ObservableObject {
         return FilterPreset(name: "Standard", exposure: 0.0, contrast: 0.0, saturation: 0.0, temperature: 0.0, vignette: 0.0)
     }
 
-    private func updateGuidance(with observation: VNFaceObservation?) {
-        guard let observation else {
-            guidanceMessage = "인물이 화면 안에 들어오도록 맞춰주세요."
-            return
-        }
-
-        let bbox = observation.boundingBox
-        let centerX = bbox.midX
-        let centerY = bbox.midY
-        let width = bbox.width
-
-        if width < 0.18 {
-            guidanceMessage = "조금 더 가까이"
-        } else if width > 0.55 {
-            guidanceMessage = "조금 더 멀리"
-        } else if centerX < 0.4 {
-            guidanceMessage = "조금 더 오른쪽으로"
-        } else if centerX > 0.6 {
-            guidanceMessage = "조금 더 왼쪽으로"
-        } else if centerY < 0.35 {
-            guidanceMessage = "조금 더 아래로"
-        } else if centerY > 0.65 {
-            guidanceMessage = "조금 더 위로"
-        } else {
-            guidanceMessage = "좋아요! 지금 구도 유지"
-        }
-    }
-
     private func persistImageToDocuments(_ image: UIImage) throws -> String {
         guard let data = image.jpegData(compressionQuality: 0.92) else {
             throw NSError(domain: "CameraViewModel", code: -1, userInfo: [NSLocalizedDescriptionKey: "이미지 인코딩 실패"])
@@ -294,32 +266,9 @@ extension CameraViewModel: AVCaptureVideoDataOutputSampleBufferDelegate {
         didOutput sampleBuffer: CMSampleBuffer,
         from connection: AVCaptureConnection
     ) {
-        let now = Date()
-        if now.timeIntervalSince(lastAnalysisTime) < analysisInterval {
-            return
-        }
-        lastAnalysisTime = now
-
-        let request = VNDetectFaceRectanglesRequest { [weak self] request, _ in
-            guard let self else { return }
-            let face = (request.results as? [VNFaceObservation])?.first
-            Task { @MainActor in
-                self.updateGuidance(with: face)
-            }
-        }
-
-        let handler = VNImageRequestHandler(
-            cmSampleBuffer: sampleBuffer,
-            orientation: .right,
-            options: [:]
-        )
-
-        do {
-            try handler.perform([request])
-        } catch {
-            Task { @MainActor in
-                self.guidanceMessage = "구도 분석에 실패했어요."
-            }
+        guard let result = guidanceEngine.analyze(sampleBuffer: sampleBuffer) else { return }
+        Task { @MainActor [weak self] in
+            self?.guidanceMessage = result.message
         }
     }
 }
