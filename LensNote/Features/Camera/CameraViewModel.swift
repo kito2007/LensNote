@@ -41,10 +41,22 @@ final class CameraViewModel: NSObject, ObservableObject {
     private let sampleBufferQueue = DispatchQueue(label: "CameraSampleBufferQueue")
     private let videoOutput = AVCaptureVideoDataOutput()
     private let photoOutput = AVCapturePhotoOutput()
+    // 카메라 프레임 -> 구도 가이드 결과를 만드는 엔진
     private nonisolated(unsafe) let guidanceEngine = CompositionGuidanceEngine()
     private nonisolated(unsafe) var photoCaptureContinuation: CheckedContinuation<UIImage?, Never>?
     private var isSessionConfigured = false
     private var isRunning = false
+    // 디바운스 후보 문구와 시작 시각
+    private var pendingGuidanceMessage: String?
+    private var pendingGuidanceSince = Date.distantPast
+    // 마지막으로 실제 UI에 반영한 문구와 시각(쿨다운 판단용)
+    private var lastGuidanceMessage: String = ""
+    private var lastGuidanceAppliedAt = Date.distantPast
+
+    // 가이드 UX 안정화 파라미터
+    private let guidanceDebounceInterval: TimeInterval = 0.5
+    private let repeatedGuidanceCooldown: TimeInterval = 1.4
+    private let minimumGuidanceConfidence: Double = 0.42
 
     init(savePhotoUseCase: SavePhotoUseCase) {
         self.savePhotoUseCase = savePhotoUseCase
@@ -53,6 +65,7 @@ final class CameraViewModel: NSObject, ObservableObject {
 
     func applyConcept() {
         preset = presetForConcept(conceptText)
+        // 사용자가 입력한 컨셉을 엔진의 씬 힌트로 전달
         guidanceEngine.updateSceneHint(from: conceptText)
     }
 
@@ -67,6 +80,7 @@ final class CameraViewModel: NSObject, ObservableObject {
             return
         }
         cameraStatusMessage = nil
+        // 카메라 재진입 시에도 현재 컨셉으로 힌트 재동기화
         guidanceEngine.updateSceneHint(from: conceptText)
 
         await configureSessionIfNeeded()
@@ -89,6 +103,8 @@ final class CameraViewModel: NSObject, ObservableObject {
             }
             Task { @MainActor in
                 self.isRunning = false
+                // 세션 종료 시 미확정 후보 문구 초기화
+                self.pendingGuidanceMessage = nil
             }
         }
     }
@@ -268,8 +284,41 @@ extension CameraViewModel: AVCaptureVideoDataOutputSampleBufferDelegate {
     ) {
         guard let result = guidanceEngine.analyze(sampleBuffer: sampleBuffer) else { return }
         Task { @MainActor [weak self] in
-            self?.guidanceMessage = result.message
+            // 고빈도 프레임 이벤트에서 바로 UI 반영하지 않고 안정화 로직 통과
+            self?.applyGuidanceResult(result)
         }
+    }
+}
+
+private extension CameraViewModel {
+    func applyGuidanceResult(_ result: CompositionGuidanceResult) {
+        // 신뢰도 낮은 결과는 사용자 혼란을 줄이기 위해 무시
+        guard result.confidence >= minimumGuidanceConfidence else { return }
+
+        let message = result.message.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !message.isEmpty else { return }
+
+        let now = Date()
+        // 방금 보여준 문구는 짧은 쿨다운 동안 재표시하지 않음
+        if message == lastGuidanceMessage,
+           now.timeIntervalSince(lastGuidanceAppliedAt) < repeatedGuidanceCooldown {
+            return
+        }
+
+        // 새 문구가 들어오면 우선 후보로 저장하고 디바운스 타이머 시작
+        if pendingGuidanceMessage != message {
+            pendingGuidanceMessage = message
+            pendingGuidanceSince = now
+            return
+        }
+
+        // 동일 후보가 debounce 기간 이상 유지되면 실제 UI 반영
+        guard now.timeIntervalSince(pendingGuidanceSince) >= guidanceDebounceInterval else { return }
+
+        guidanceMessage = message
+        lastGuidanceMessage = message
+        lastGuidanceAppliedAt = now
+        pendingGuidanceMessage = nil
     }
 }
 

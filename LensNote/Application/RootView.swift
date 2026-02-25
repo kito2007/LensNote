@@ -9,7 +9,6 @@ import SwiftUI
 
 struct RootView: View {
     let cameraVM: CameraViewModel
-    let galleryVM: GalleryViewModel
     @StateObject private var mapVM = MapViewModel()
 
     var body: some View {
@@ -17,11 +16,8 @@ struct RootView: View {
             CameraView(viewModel: cameraVM)
                 .tabItem { Label("Camera", systemImage: "camera") }
 
-            GalleryView(viewModel: galleryVM)
-                .tabItem { Label("Gallery", systemImage: "photo.on.rectangle") }
-
             MapView(viewModel: mapVM)
-                .tabItem { Label("Map", systemImage: "map") }
+                .tabItem { Label("Map Gallery", systemImage: "map") }
         }
         .onAppear {
             Task {
