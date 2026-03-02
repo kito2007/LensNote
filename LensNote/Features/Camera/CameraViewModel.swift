@@ -43,6 +43,8 @@ final class CameraViewModel: NSObject, ObservableObject {
     private let photoOutput = AVCapturePhotoOutput()
     // 카메라 프레임 -> 구도 가이드 결과를 만드는 엔진
     private nonisolated(unsafe) let guidanceEngine = CompositionGuidanceEngine()
+    // 모델 학습/평가를 위한 프레임-가이드 샘플 기록기(JSONL)
+    private let guidanceDatasetRecorder = GuidanceDatasetRecorder()
     private nonisolated(unsafe) var photoCaptureContinuation: CheckedContinuation<UIImage?, Never>?
     private var isSessionConfigured = false
     private var isRunning = false
@@ -285,40 +287,43 @@ extension CameraViewModel: AVCaptureVideoDataOutputSampleBufferDelegate {
         guard let result = guidanceEngine.analyze(sampleBuffer: sampleBuffer) else { return }
         Task { @MainActor [weak self] in
             // 고빈도 프레임 이벤트에서 바로 UI 반영하지 않고 안정화 로직 통과
-            self?.applyGuidanceResult(result)
+            guard let self else { return }
+            let accepted = self.applyGuidanceResult(result)
+            self.guidanceDatasetRecorder.record(result: result, concept: self.conceptText, acceptedForUI: accepted)
         }
     }
 }
 
 private extension CameraViewModel {
-    func applyGuidanceResult(_ result: CompositionGuidanceResult) {
+    func applyGuidanceResult(_ result: CompositionGuidanceResult) -> Bool {
         // 신뢰도 낮은 결과는 사용자 혼란을 줄이기 위해 무시
-        guard result.confidence >= minimumGuidanceConfidence else { return }
+        guard result.confidence >= minimumGuidanceConfidence else { return false }
 
         let message = result.message.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !message.isEmpty else { return }
+        guard !message.isEmpty else { return false }
 
         let now = Date()
         // 방금 보여준 문구는 짧은 쿨다운 동안 재표시하지 않음
         if message == lastGuidanceMessage,
            now.timeIntervalSince(lastGuidanceAppliedAt) < repeatedGuidanceCooldown {
-            return
+            return false
         }
 
         // 새 문구가 들어오면 우선 후보로 저장하고 디바운스 타이머 시작
         if pendingGuidanceMessage != message {
             pendingGuidanceMessage = message
             pendingGuidanceSince = now
-            return
+            return false
         }
 
         // 동일 후보가 debounce 기간 이상 유지되면 실제 UI 반영
-        guard now.timeIntervalSince(pendingGuidanceSince) >= guidanceDebounceInterval else { return }
+        guard now.timeIntervalSince(pendingGuidanceSince) >= guidanceDebounceInterval else { return false }
 
         guidanceMessage = message
         lastGuidanceMessage = message
         lastGuidanceAppliedAt = now
         pendingGuidanceMessage = nil
+        return true
     }
 }
 
