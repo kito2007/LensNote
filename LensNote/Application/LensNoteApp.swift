@@ -7,6 +7,8 @@
 
 import SwiftUI
 
+/// 앱 진입점.
+/// 공용 repository 인스턴스를 한 번만 만들고 각 탭 ViewModel에 주입한다.
 @main
 struct LensNoteApp: App {
 
@@ -16,6 +18,7 @@ struct LensNoteApp: App {
 
     var body: some Scene {
         WindowGroup {
+            // 저장 유스케이스를 Camera ViewModel에 주입
             let saveUseCase = SavePhotoUseCase(repository: photoRepository)
 
             let cameraVM = CameraViewModel(savePhotoUseCase: saveUseCase)

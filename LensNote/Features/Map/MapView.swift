@@ -24,6 +24,7 @@ struct PhotoPin: Identifiable, Equatable {
     let longitude: Double
     let title: String
     let createdAt: Date
+    let assetLocalIdentifier: String?
     let thumbnail: UIImage?
 
     /// MKMapKit에서 사용하는 좌표 타입으로 변환한 값
@@ -88,12 +89,10 @@ final class MapViewModel: NSObject, ObservableObject, PHPhotoLibraryChangeObserv
     @Published var isLoading: Bool = false
 
     // 내부 상태/도구들:
-    // - imageManager: 사진 썸네일 캐싱/요청
     // - geocoder: 좌표 -> 지명 역지오코딩
     // - fetchResult/loadTask: 포토 라이브러리 페치와 비동기 배치 로딩
     // - geocodeCache/Queue: 지명 캐시와 큐(중복 방지용 키 포함)
     // - hasLoadedPhotos: 중복 로딩 방지 플래그
-    private let imageManager = PHCachingImageManager()
     private let geocoder = CLGeocoder()
     private var fetchResult: PHFetchResult<PHAsset>?
     private var loadTask: Task<Void, Never>?
@@ -131,6 +130,7 @@ final class MapViewModel: NSObject, ObservableObject, PHPhotoLibraryChangeObserv
                 longitude: 126.9780,
                 title: "Seoul City Hall",
                 createdAt: Date().addingTimeInterval(-3600),
+                assetLocalIdentifier: nil,
                 thumbnail: UIImage(systemName: "photo")
             ),
             PhotoPin(
@@ -139,6 +139,7 @@ final class MapViewModel: NSObject, ObservableObject, PHPhotoLibraryChangeObserv
                 longitude: 126.9769,
                 title: "Gyeongbokgung",
                 createdAt: Date().addingTimeInterval(-7200),
+                assetLocalIdentifier: nil,
                 thumbnail: UIImage(systemName: "photo.fill")
             ),
             PhotoPin(
@@ -147,6 +148,7 @@ final class MapViewModel: NSObject, ObservableObject, PHPhotoLibraryChangeObserv
                 longitude: 126.9882,
                 title: "Namsan Tower",
                 createdAt: Date().addingTimeInterval(-14400),
+                assetLocalIdentifier: nil,
                 thumbnail: UIImage(systemName: "photo.on.rectangle")
             )
         ]
@@ -231,8 +233,6 @@ final class MapViewModel: NSObject, ObservableObject, PHPhotoLibraryChangeObserv
         fetchResult = result
         loadedAssetIndex = 0
         pins = []
-        imageManager.stopCachingImagesForAllAssets()
-
         await loadNextBatch(from: result, size: initialBatchSize)
 
         if loadedAssetIndex < result.count {
@@ -256,16 +256,13 @@ final class MapViewModel: NSObject, ObservableObject, PHPhotoLibraryChangeObserv
         let endIndex = min(loadedAssetIndex + size, result.count)
         guard loadedAssetIndex < endIndex else { return }
 
-        var assets: [PHAsset] = []
         var batchPins: [PhotoPin] = []
 
         while loadedAssetIndex < endIndex {
             let asset = result.object(at: loadedAssetIndex)
             loadedAssetIndex += 1
-            assets.append(asset)
 
             guard let location = asset.location else { continue }
-            let thumbnail = await requestThumbnail(for: asset)
 
             batchPins.append(
                 PhotoPin(
@@ -274,17 +271,9 @@ final class MapViewModel: NSObject, ObservableObject, PHPhotoLibraryChangeObserv
                     longitude: location.coordinate.longitude,
                     title: title(for: asset, at: location, placeName: nil),
                     createdAt: asset.creationDate ?? Date(),
-                    thumbnail: thumbnail
+                    assetLocalIdentifier: asset.localIdentifier,
+                    thumbnail: nil
                 )
-            )
-        }
-
-        if !assets.isEmpty {
-            imageManager.startCachingImages(
-                for: assets,
-                targetSize: thumbnailTargetSize,
-                contentMode: .aspectFill,
-                options: thumbnailRequestOptions
             )
         }
 
@@ -304,46 +293,6 @@ final class MapViewModel: NSObject, ObservableObject, PHPhotoLibraryChangeObserv
                 location.coordinate.longitude
             )
             return "\(dateTitle) · \(coordinateTitle)"
-        }
-    }
-
-    /// 썸네일 타깃 크기
-    private var thumbnailTargetSize: CGSize {
-        CGSize(width: 120, height: 120)
-    }
-
-    /// 썸네일 요청 옵션(네트워크 허용, 고화질, 비동기)
-    private var thumbnailRequestOptions: PHImageRequestOptions {
-        let options = PHImageRequestOptions()
-        options.isNetworkAccessAllowed = true
-        options.deliveryMode = .highQualityFormat
-        options.resizeMode = .fast
-        options.isSynchronous = false
-        return options
-    }
-
-    /// PHImageManager를 통해 비동기로 썸네일을 요청(저품질 콜백은 건너뜀)
-    private func requestThumbnail(for asset: PHAsset) async -> UIImage? {
-        await withCheckedContinuation { continuation in
-            var didResume = false
-            imageManager.requestImage(
-                for: asset,
-                targetSize: thumbnailTargetSize,
-                contentMode: .aspectFill,
-                options: thumbnailRequestOptions
-            ) { image, info in
-                if didResume {
-                    return
-                }
-
-                let isDegraded = (info?[PHImageResultIsDegradedKey] as? Bool) ?? false
-                if isDegraded {
-                    return
-                }
-
-                didResume = true
-                continuation.resume(returning: image)
-            }
         }
     }
 
@@ -408,6 +357,7 @@ final class MapViewModel: NSObject, ObservableObject, PHPhotoLibraryChangeObserv
                 longitude: pin.longitude,
                 title: newTitle,
                 createdAt: pin.createdAt,
+                assetLocalIdentifier: pin.assetLocalIdentifier,
                 thumbnail: pin.thumbnail
             )
         }
@@ -659,7 +609,7 @@ struct MapView: View {
 
     /// 핀이 너무 많을 때 격자 버킷으로 대표 핀만 남겨 UI 부하 감소
     private func downsamplePins(_ pins: [PhotoPin], in region: MKCoordinateRegion) -> [PhotoPin] {
-        guard pins.count > 400 else { return pins }
+        guard pins.count > 250 else { return pins }
 
         let latStep = max(region.span.latitudeDelta / 25, 0.001)
         let lonStep = max(region.span.longitudeDelta / 25, 0.001)
@@ -743,6 +693,7 @@ private struct ClusterBadgeView: View {
 private struct SidePanelList: View {
     let pins: [PhotoPin]
     @Binding var selection: UUID?
+    private var displayedPins: [PhotoPin] { Array(pins.prefix(60)) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -759,7 +710,7 @@ private struct SidePanelList: View {
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 10) {
-                    ForEach(pins) { pin in
+                    ForEach(displayedPins) { pin in
                         Button {
                             withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
                                 selection = pin.id
@@ -767,17 +718,7 @@ private struct SidePanelList: View {
                         } label: {
                             HStack(spacing: 8) {
                                 Group {
-                                    if let image = pin.thumbnail {
-                                        Image(uiImage: image)
-                                            .resizable()
-                                            .scaledToFill()
-                                    } else {
-                                        Image(systemName: "photo")
-                                            .resizable()
-                                            .scaledToFit()
-                                            .padding(10)
-                                            .foregroundStyle(.secondary)
-                                    }
+                                    PinThumbnailView(pin: pin, size: 48)
                                 }
                                 .frame(width: 48, height: 48)
                                 .background(Color(.systemGray5))
@@ -845,18 +786,7 @@ private struct PinCardView: View {
     }
 
     private var thumbnail: some View {
-        Group {
-            if let image = pin.thumbnail {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFill()
-            } else {
-                Image(systemName: "photo")
-                    .resizable()
-                    .scaledToFill()
-                    .foregroundStyle(.secondary)
-            }
-        }
+        PinThumbnailView(pin: pin, size: 44)
         .frame(width: 44, height: 44)
         .background(Color(.systemGray5))
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
@@ -942,7 +872,84 @@ private struct LoadingBannerView: View {
     }
 }
 
+private struct PinThumbnailView: View {
+    let pin: PhotoPin
+    let size: CGFloat
+
+    @State private var loadedImage: UIImage?
+
+    var body: some View {
+        Group {
+            if let loadedImage {
+                Image(uiImage: loadedImage)
+                    .resizable()
+                    .scaledToFill()
+            } else if let fallback = pin.thumbnail {
+                Image(uiImage: fallback)
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                Image(systemName: "photo")
+                    .resizable()
+                    .scaledToFit()
+                    .padding(size * 0.2)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .task(id: pin.assetLocalIdentifier) {
+            guard loadedImage == nil,
+                  let identifier = pin.assetLocalIdentifier else { return }
+            loadedImage = await MapThumbnailLoader.shared.load(localIdentifier: identifier, targetSize: CGSize(width: size * 2, height: size * 2))
+        }
+    }
+}
+
+private final class MapThumbnailLoader {
+    static let shared = MapThumbnailLoader()
+
+    private let imageManager = PHCachingImageManager()
+    private let cache = NSCache<NSString, UIImage>()
+
+    private init() {}
+
+    func load(localIdentifier: String, targetSize: CGSize) async -> UIImage? {
+        let key = "\(localIdentifier)_\(Int(targetSize.width))x\(Int(targetSize.height))" as NSString
+        if let cached = cache.object(forKey: key) {
+            return cached
+        }
+
+        let fetchResult = PHAsset.fetchAssets(withLocalIdentifiers: [localIdentifier], options: nil)
+        guard let asset = fetchResult.firstObject else { return nil }
+
+        let options = PHImageRequestOptions()
+        options.deliveryMode = .fastFormat
+        options.resizeMode = .fast
+        options.isSynchronous = false
+        options.isNetworkAccessAllowed = false
+
+        let image = await withCheckedContinuation { continuation in
+            var didResume = false
+            imageManager.requestImage(
+                for: asset,
+                targetSize: targetSize,
+                contentMode: .aspectFill,
+                options: options
+            ) { image, info in
+                if didResume { return }
+                let isDegraded = (info?[PHImageResultIsDegradedKey] as? Bool) ?? false
+                if isDegraded { return }
+                didResume = true
+                continuation.resume(returning: image)
+            }
+        }
+
+        if let image {
+            cache.setObject(image, forKey: key)
+        }
+        return image
+    }
+}
+
 #Preview {
     MapView(viewModel: MapViewModel())
 }
-

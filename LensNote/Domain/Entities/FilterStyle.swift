@@ -7,6 +7,8 @@
 
 import Foundation
 
+/// 후처리 필터의 기본 스타일 분류.
+/// 현재는 고정 enum이지만, 추후 서버/모델 기반 추천값으로 확장 가능하다.
 public enum FilterStyle: String, Codable, CaseIterable {
     case filmSoft = "film_soft"
     case vivid
@@ -17,6 +19,7 @@ public enum FilterStyle: String, Codable, CaseIterable {
 }
 
 public extension FilterStyle {
+    /// UI에서 사용하는 한국어 표시 이름.
     var displayNameKR: String {
         switch self {
         case .filmSoft: return "필름 소프트"

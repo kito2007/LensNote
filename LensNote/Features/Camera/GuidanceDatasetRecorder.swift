@@ -8,6 +8,7 @@
 import Foundation
 import OSLog
 
+/// 프레임 단위 가이드 로그를 학습/분석용 JSONL로 저장하는 레코드 포맷.
 struct GuidanceDatasetRecord: Codable {
     let timestamp: String
     let concept: String
@@ -18,6 +19,10 @@ struct GuidanceDatasetRecord: Codable {
     let features: CompositionFeatureSnapshot
 }
 
+/// 카메라 어시스트 데이터셋 기록기.
+/// 핵심 원칙:
+/// - UI 스레드 블로킹 방지를 위해 전용 큐에서 파일 append
+/// - 과도한 로그 생성을 막기 위한 최소 기록 간격 적용
 final class GuidanceDatasetRecorder {
     private let queue = DispatchQueue(label: "GuidanceDatasetRecorderQueue")
     private let logger = Logger(subsystem: "LensNote", category: "GuidanceDataset")
@@ -33,6 +38,7 @@ final class GuidanceDatasetRecorder {
         encoder.outputFormatting = [.withoutEscapingSlashes]
     }
 
+    /// 분석 결과 1건을 JSONL 라인으로 기록한다.
     func record(result: CompositionGuidanceResult, concept: String, acceptedForUI: Bool) {
         let now = Date()
         guard now.timeIntervalSince(lastRecordTime) >= minimumRecordInterval else { return }
@@ -74,6 +80,7 @@ final class GuidanceDatasetRecorder {
     }
 
     private func resolveFileURL() throws -> URL {
+        // 1회 경로 결정 후 재사용해 파일 open 비용을 줄인다.
         if let fileURL { return fileURL }
 
         let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first

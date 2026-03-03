@@ -7,6 +7,8 @@
 
 import Foundation
 
+/// 촬영 장면(씬) 분류.
+/// 카메라 어시스트, 스타일 추천, 모델 입력 feature에서 공통으로 사용한다.
 public enum SceneType: String, Codable, CaseIterable {
     case portrait
     case landscape
@@ -18,6 +20,7 @@ public enum SceneType: String, Codable, CaseIterable {
 }
 
 public extension SceneType {
+    /// UI 표시용 한국어 이름.
     var displayNameKR: String {
         switch self {
         case .portrait: return "인물"

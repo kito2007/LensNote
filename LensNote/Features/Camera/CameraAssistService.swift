@@ -8,6 +8,7 @@
 import Foundation
 import UIKit
 
+/// 카메라 화면 상단 패널에 표시되는 추천 촬영값 묶음.
 struct CameraRecommendation {
     let title: String
     let iso: String
@@ -16,12 +17,17 @@ struct CameraRecommendation {
     let whiteBalance: String
 }
 
+/// 카메라 어시스트 기능 추상화.
+/// - recommendation: 촬영 파라미터 추천
+/// - compositionTips: 현재 가이드 문구를 포함한 구도 팁 리스트
+/// - analyzeReferenceImage: 레퍼런스 사진 기반 초기 프리셋 생성
 protocol CameraAssistServiceProtocol {
     func recommendation(from preset: FilterPreset?, concept: String) -> CameraRecommendation
     func compositionTips(concept: String, guidance: String) -> [String]
     func analyzeReferenceImage(_ image: UIImage) -> FilterPreset
 }
 
+/// CoreML 연동 전 동작 확인용 규칙 기반 구현.
 struct MockCameraAssistService: CameraAssistServiceProtocol {
     func recommendation(from preset: FilterPreset?, concept: String) -> CameraRecommendation {
         let normalized = concept.lowercased()
@@ -72,6 +78,8 @@ struct MockCameraAssistService: CameraAssistServiceProtocol {
     }
 }
 
+/// 실제 배포 대상 구현 자리.
+/// 현재는 Mock 구현을 위임하지만 추후 CoreML 추론으로 교체한다.
 struct CoreMLCameraAssistService: CameraAssistServiceProtocol {
     func recommendation(from preset: FilterPreset?, concept: String) -> CameraRecommendation {
         // TODO: CoreML 모델 추론 결과로 교체.

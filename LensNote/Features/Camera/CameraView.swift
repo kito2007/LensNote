@@ -10,6 +10,7 @@ import AVFoundation
 import PhotosUI
 import UIKit
 
+/// 카메라 플로우 단계 상태.
 private enum CameraInputMode: String {
     case select
     case photo
@@ -19,6 +20,7 @@ private enum CameraInputMode: String {
     case result
 }
 
+/// Camera 화면 공통 디자인 상수.
 private struct CameraDesign {
     static let screenPadding: CGFloat = 16
     static let cardRadius: CGFloat = 14
@@ -27,6 +29,8 @@ private struct CameraDesign {
     static let itemSpacing: CGFloat = 12
 }
 
+/// 카메라 탭 메인 화면.
+/// 입력(레퍼런스/텍스트/수동) -> 촬영 -> 결과 저장의 플로우를 하나의 상태 머신(step)으로 관리한다.
 struct CameraView: View {
     @StateObject private var viewModel: CameraViewModel
 
@@ -77,6 +81,7 @@ struct CameraView: View {
         .animation(.easeInOut(duration: 0.25), value: step)
         .animation(.spring(response: 0.35, dampingFraction: 0.86), value: showSaveSuccess)
         .task(id: step) {
+            // 카메라 단계에서만 AVCaptureSession을 실행하고, 나머지 단계에서는 중지한다.
             if step == .camera {
                 await viewModel.startSessionIfNeeded()
             } else {
@@ -282,6 +287,7 @@ struct CameraView: View {
 
     private var liveCameraStep: some View {
         ZStack {
+            // UIKit 기반 AVCaptureVideoPreviewLayer 래퍼 뷰
             CameraPreview(session: viewModel.session)
                 .ignoresSafeArea()
 
@@ -419,6 +425,7 @@ struct CameraView: View {
 
             Button {
                 Task {
+                    // 촬영은 async로 수행하고 성공 시 결과 단계로 전환.
                     if let image = await viewModel.capturePhoto() {
                         await MainActor.run {
                             capturedImage = image
@@ -510,6 +517,7 @@ struct CameraView: View {
     }
 
     private func loadReferenceImage(from item: PhotosPickerItem) async {
+        // PhotosPickerItem -> Data -> UIImage 변환
         guard let data = try? await item.loadTransferable(type: Data.self),
               let image = UIImage(data: data) else { return }
         await MainActor.run {
@@ -523,6 +531,7 @@ struct CameraView: View {
         isAnalyzing = true
 
         Task { @MainActor in
+            // UX용 짧은 지연 후 분석 결과를 반영
             try? await Task.sleep(nanoseconds: 900_000_000)
             viewModel.preset = assistService.analyzeReferenceImage(image)
             viewModel.conceptText = "Reference Mood"
