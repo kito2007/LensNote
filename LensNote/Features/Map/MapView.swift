@@ -431,6 +431,7 @@ struct MapView: View {
     @State private var selection: UUID?
     @State private var currentRegion: MKCoordinateRegion?
     @State private var clusteredItems: [ClusterItem] = []
+    @State private var clusterRebuildTask: Task<Void, Never>?
 
     /// onChange 관찰을 위한 비교 가능 키(문자열)로 현재 영역의 중심/스팬을 반올림하여 구성
     private var regionSignature: String? {
@@ -484,7 +485,7 @@ struct MapView: View {
                 .task {
                     try? await Task.sleep(nanoseconds: 200_000_000)
                     await viewModel.loadPhotoPinsIfNeeded()
-                    clusteredItems = buildClusters(from: visiblePins, in: currentRegion)
+                    scheduleClusterRebuild(immediate: true)
                 }
                 // 카메라 변경 시 현재 영역 업데이트
                 .onMapCameraChange { context in
@@ -492,12 +493,12 @@ struct MapView: View {
                 }
                 // 영역 시그니처 변경 시 클러스터 재계산
                 .onChange(of: regionSignature) { _ in
-                    clusteredItems = buildClusters(from: visiblePins, in: currentRegion)
+                    scheduleClusterRebuild()
                 }
                 // 보이는 핀 변경 시 지명 업데이트 및 클러스터 재계산
                 .onChange(of: visiblePins.map(\.id)) { _ in
                     viewModel.updatePlaceNamesIfNeeded(for: visiblePins)
-                    clusteredItems = buildClusters(from: visiblePins, in: currentRegion)
+                    scheduleClusterRebuild()
                 }
                 // 선택 변경 시 포커스/줌 애니메이션 + 카드 열기/닫기
                 .onChange(of: selection) { newValue in
@@ -529,6 +530,10 @@ struct MapView: View {
                             viewModel.closeCard()
                         }
                     }
+                }
+                .onDisappear {
+                    clusterRebuildTask?.cancel()
+                    clusterRebuildTask = nil
                 }
                 .onChange(of: viewModel.selectedPin?.id) { newValue in
                     if selection != newValue {
@@ -656,6 +661,26 @@ struct MapView: View {
             }
         }
         return items
+    }
+
+    /// 지도 이동/줌 중 과도한 클러스터 재계산을 줄이기 위한 디바운스 스케줄러.
+    /// immediate가 true면 즉시 계산, false면 짧게 지연 후 마지막 상태만 반영한다.
+    private func scheduleClusterRebuild(immediate: Bool = false) {
+        clusterRebuildTask?.cancel()
+
+        let pinsSnapshot = visiblePins
+        let regionSnapshot = currentRegion
+
+        if immediate {
+            clusteredItems = buildClusters(from: pinsSnapshot, in: regionSnapshot)
+            return
+        }
+
+        clusterRebuildTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 130_000_000)
+            guard !Task.isCancelled else { return }
+            clusteredItems = buildClusters(from: pinsSnapshot, in: regionSnapshot)
+        }
     }
 }
 
