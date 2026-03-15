@@ -34,14 +34,16 @@ private enum CompositionModelSchema {
 }
 
 struct CompositionGuidanceResult {
-    // UI에 보여줄 최종 가이드 문구
+    /// 최종적으로 사용자에게 보여줄 문구.
     let message: String
-    // 엔진이 판단한 결과 신뢰도(0~1)
+    /// 문구에 대한 신뢰도.
     let confidence: Double
-    // 어떤 경로에서 나온 결과인지(모델/규칙)
+    /// 모델/휴리스틱 중 어떤 경로에서 나온 결과인지.
     let source: CompositionGuidanceSource
-    // 학습/분석용 숫자 피처 스냅샷
+    /// 데이터셋 기록용 feature 스냅샷.
     let featureSnapshot: CompositionFeatureSnapshot
+    /// target 비교 기반 정량 평가 결과.
+    let evaluation: CompositionEvaluation
 }
 
 enum CompositionGuidanceSource: String, Codable {
@@ -60,30 +62,30 @@ struct CompositionFeatureSnapshot: Codable {
     let brightness: Double
     let sharpness: Double
     let sceneType: String
+    let devicePitch: Double?
+    let deviceRoll: Double?
+    let motionStable: Bool
+    let overallScore: Double
+    let readyToCapture: Bool
 }
 
+/// 한 프레임에서 추출한 Vision/픽셀/motion 신호 묶음.
 struct FrameFeatures {
-    // 현재 프레임에서 감지된 대표 얼굴(없으면 nil)
     let faceObservation: VNFaceObservation?
-    // Vision Saliency 기반 주목 영역 중심(정규화 좌표, 없으면 nil)
     let saliencyCenter: CGPoint?
-    // 수평선 기울기(라디안, 없으면 nil)
     let horizonAngle: Double?
-    // 0~1 범위 밝기 추정치
     let brightness: Double
-    // 프레임 내 에지 변화량 기반 선명도(간이 지표)
     let sharpness: Double
-    // 컨셉 텍스트에서 추론한 씬 힌트
     let sceneType: SceneType
+    let devicePose: DevicePose
 }
 
 struct ModelSuggestion {
-    // 모델이 제안한 가이드 문구
     let message: String
-    // 모델 출력 신뢰도
     let confidence: Double
 }
 
+/// 모든 프레임을 다 분석하지 않고, 일정 간격으로만 추론하게 하는 스케줄러.
 final class GuidanceInferenceScheduler {
     private let targetFrameStride: Int
     private let baseInterval: TimeInterval
@@ -96,12 +98,9 @@ final class GuidanceInferenceScheduler {
     }
 
     func shouldRun(now: Date = Date()) -> Bool {
-        // 1) 프레임 스트라이드 기준(예: 10프레임마다)으로 1차 필터링
         frameCount += 1
         guard frameCount % targetFrameStride == 0 else { return false }
 
-        // 2) 마지막 추론 시점과의 시간 간격으로 2차 필터링
-        //    (저전력/열 상태에 따라 간격이 동적으로 늘어남)
         let elapsed = now.timeIntervalSince(lastInferenceTime)
         guard elapsed >= currentInterval else { return false }
 
@@ -135,6 +134,7 @@ protocol CompositionModelServing {
     func suggestion(for features: FrameFeatures) -> ModelSuggestion?
 }
 
+/// CoreML 모델이 있으면 우선 사용하고, 없으면 nil을 반환해 fallback을 유도한다.
 final class CoreMLCompositionModelService: CompositionModelServing {
     private let modelName: String
     private var model: MLModel?
@@ -148,9 +148,7 @@ final class CoreMLCompositionModelService: CompositionModelServing {
     }
 
     func suggestion(for features: FrameFeatures) -> ModelSuggestion? {
-        // 모델 로드는 최초 1회만 시도
         loadModelIfNeeded()
-        // 모델이 없으면 상위 엔진이 규칙 기반 fallback을 사용
         guard let model else {
             if !didLogMissingModel {
                 logger.info("CompositionAssist model not found. Using Vision + heuristic fallback.")
@@ -164,12 +162,10 @@ final class CoreMLCompositionModelService: CompositionModelServing {
         }
 
         do {
-            // 모델 입력 스키마에 맞춰 동적 피처 딕셔너리 생성
             let provider = try MLDictionaryFeatureProvider(dictionary: inputDictionary(for: features, model: model))
             let output = try model.prediction(from: provider)
             return decodeSuggestion(from: output)
         } catch {
-            // 추론 실패 시에도 앱 동작을 멈추지 않고 fallback으로 진행
             logger.warning("CompositionAssist inference failed. Falling back to heuristic guidance.")
             return nil
         }
@@ -180,14 +176,12 @@ final class CoreMLCompositionModelService: CompositionModelServing {
         didAttemptLoading = true
 
         let bundle = Bundle.main
-        // 우선 컴파일된 모델(.mlmodelc) 탐색
         if let compiledURL = bundle.url(forResource: modelName, withExtension: "mlmodelc"),
            let loaded = try? MLModel(contentsOf: compiledURL) {
             model = loaded
             return
         }
 
-        // 없으면 원본(.mlmodel)을 런타임 컴파일해 로드 시도
         if let sourceURL = bundle.url(forResource: modelName, withExtension: "mlmodel"),
            let compiledURL = try? MLModel.compileModel(at: sourceURL),
            let loaded = try? MLModel(contentsOf: compiledURL) {
@@ -201,7 +195,6 @@ final class CoreMLCompositionModelService: CompositionModelServing {
 
         for name in inputNames {
             let normalized = normalizeFeatureName(name)
-            // 모델 입력명을 스키마 별칭으로 매칭해 타입 안전하게 값 공급
             if CompositionModelSchema.Input.faceCenterX.contains(normalized) {
                 dictionary[name] = MLFeatureValue(double: Double(features.faceObservation?.boundingBox.midX ?? 0.5))
             } else if CompositionModelSchema.Input.faceCenterY.contains(normalized) {
@@ -215,7 +208,7 @@ final class CoreMLCompositionModelService: CompositionModelServing {
             } else if CompositionModelSchema.Input.saliencyY.contains(normalized) {
                 dictionary[name] = MLFeatureValue(double: Double(features.saliencyCenter?.y ?? 0.5))
             } else if CompositionModelSchema.Input.horizonAngle.contains(normalized) {
-                dictionary[name] = MLFeatureValue(double: features.horizonAngle ?? 0.0)
+                dictionary[name] = MLFeatureValue(double: features.horizonAngle ?? features.devicePose.roll)
             } else if CompositionModelSchema.Input.brightness.contains(normalized) {
                 dictionary[name] = MLFeatureValue(double: features.brightness)
             } else if CompositionModelSchema.Input.sharpness.contains(normalized) {
@@ -231,14 +224,12 @@ final class CoreMLCompositionModelService: CompositionModelServing {
     }
 
     private func decodeSuggestion(from output: MLFeatureProvider) -> ModelSuggestion? {
-        // 1순위: 모델이 직접 텍스트를 주는 경우
         if let text = firstStringValue(from: output, aliases: CompositionModelSchema.Output.guidanceText),
            !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             let confidence = firstDoubleValue(from: output, aliases: CompositionModelSchema.Output.confidence) ?? 0.55
             return ModelSuggestion(message: text, confidence: confidence)
         }
 
-        // 2순위: 코드값을 반환하는 경우 앱 문구로 매핑
         if let code = firstInt64Value(from: output, aliases: CompositionModelSchema.Output.guidanceCode) {
             let mapped = mappedMessage(code: code)
             if !mapped.isEmpty {
@@ -303,89 +294,20 @@ final class CoreMLCompositionModelService: CompositionModelServing {
         let normalizedInputs = Dictionary(uniqueKeysWithValues: inputDescriptions.map { (normalizeFeatureName($0.key), $0.value) })
         let normalizedOutputs = Dictionary(uniqueKeysWithValues: outputDescriptions.map { (normalizeFeatureName($0.key), $0.value) })
 
-        // 필수 입력/출력의 존재 여부를 먼저 검증
-        validateRequiredFeature(
-            category: "input",
-            normalizedDescriptions: normalizedInputs,
-            aliases: CompositionModelSchema.Input.faceCenterX,
-            expectedTypes: [.double]
-        )
-        validateRequiredFeature(
-            category: "input",
-            normalizedDescriptions: normalizedInputs,
-            aliases: CompositionModelSchema.Input.faceCenterY,
-            expectedTypes: [.double]
-        )
-        validateRequiredFeature(
-            category: "input",
-            normalizedDescriptions: normalizedInputs,
-            aliases: CompositionModelSchema.Input.faceSize,
-            expectedTypes: [.double]
-        )
-        validateRequiredFeature(
-            category: "input",
-            normalizedDescriptions: normalizedInputs,
-            aliases: CompositionModelSchema.Input.faceDetected,
-            expectedTypes: [.int64, .double]
-        )
-        validateRequiredFeature(
-            category: "input",
-            normalizedDescriptions: normalizedInputs,
-            aliases: CompositionModelSchema.Input.saliencyX,
-            expectedTypes: [.double]
-        )
-        validateRequiredFeature(
-            category: "input",
-            normalizedDescriptions: normalizedInputs,
-            aliases: CompositionModelSchema.Input.saliencyY,
-            expectedTypes: [.double]
-        )
-        validateRequiredFeature(
-            category: "input",
-            normalizedDescriptions: normalizedInputs,
-            aliases: CompositionModelSchema.Input.horizonAngle,
-            expectedTypes: [.double]
-        )
-        validateRequiredFeature(
-            category: "input",
-            normalizedDescriptions: normalizedInputs,
-            aliases: CompositionModelSchema.Input.brightness,
-            expectedTypes: [.double]
-        )
-        validateRequiredFeature(
-            category: "input",
-            normalizedDescriptions: normalizedInputs,
-            aliases: CompositionModelSchema.Input.sharpness,
-            expectedTypes: [.double]
-        )
-        validateRequiredFeature(
-            category: "input",
-            normalizedDescriptions: normalizedInputs,
-            aliases: CompositionModelSchema.Input.sceneType,
-            expectedTypes: [.int64, .double]
-        )
+        validateRequiredFeature(category: "input", normalizedDescriptions: normalizedInputs, aliases: CompositionModelSchema.Input.faceCenterX, expectedTypes: [.double])
+        validateRequiredFeature(category: "input", normalizedDescriptions: normalizedInputs, aliases: CompositionModelSchema.Input.faceCenterY, expectedTypes: [.double])
+        validateRequiredFeature(category: "input", normalizedDescriptions: normalizedInputs, aliases: CompositionModelSchema.Input.faceSize, expectedTypes: [.double])
+        validateRequiredFeature(category: "input", normalizedDescriptions: normalizedInputs, aliases: CompositionModelSchema.Input.faceDetected, expectedTypes: [.int64, .double])
+        validateRequiredFeature(category: "input", normalizedDescriptions: normalizedInputs, aliases: CompositionModelSchema.Input.saliencyX, expectedTypes: [.double])
+        validateRequiredFeature(category: "input", normalizedDescriptions: normalizedInputs, aliases: CompositionModelSchema.Input.saliencyY, expectedTypes: [.double])
+        validateRequiredFeature(category: "input", normalizedDescriptions: normalizedInputs, aliases: CompositionModelSchema.Input.horizonAngle, expectedTypes: [.double])
+        validateRequiredFeature(category: "input", normalizedDescriptions: normalizedInputs, aliases: CompositionModelSchema.Input.brightness, expectedTypes: [.double])
+        validateRequiredFeature(category: "input", normalizedDescriptions: normalizedInputs, aliases: CompositionModelSchema.Input.sharpness, expectedTypes: [.double])
+        validateRequiredFeature(category: "input", normalizedDescriptions: normalizedInputs, aliases: CompositionModelSchema.Input.sceneType, expectedTypes: [.int64, .double])
 
-        validateRequiredFeature(
-            category: "output",
-            normalizedDescriptions: normalizedOutputs,
-            aliases: CompositionModelSchema.Output.guidanceText,
-            expectedTypes: [.string],
-            required: false
-        )
-        validateRequiredFeature(
-            category: "output",
-            normalizedDescriptions: normalizedOutputs,
-            aliases: CompositionModelSchema.Output.guidanceCode,
-            expectedTypes: [.int64, .double],
-            required: false
-        )
-        validateRequiredFeature(
-            category: "output",
-            normalizedDescriptions: normalizedOutputs,
-            aliases: CompositionModelSchema.Output.confidence,
-            expectedTypes: [.double],
-            required: false
-        )
+        validateRequiredFeature(category: "output", normalizedDescriptions: normalizedOutputs, aliases: CompositionModelSchema.Output.guidanceText, expectedTypes: [.string], required: false)
+        validateRequiredFeature(category: "output", normalizedDescriptions: normalizedOutputs, aliases: CompositionModelSchema.Output.guidanceCode, expectedTypes: [.int64, .double], required: false)
+        validateRequiredFeature(category: "output", normalizedDescriptions: normalizedOutputs, aliases: CompositionModelSchema.Output.confidence, expectedTypes: [.double], required: false)
 
         logger.info("CompositionAssist schema validation finished.")
     }
@@ -428,6 +350,8 @@ final class CompositionGuidanceEngine {
     private let scheduler: GuidanceInferenceScheduler
     private let modelService: CompositionModelServing
     private var sceneHint: SceneType = .etc
+    private var lastHeuristicMessage: String = ""
+    private var heuristicRepeatCount: Int = 0
 
     init(
         scheduler: GuidanceInferenceScheduler = GuidanceInferenceScheduler(),
@@ -438,8 +362,6 @@ final class CompositionGuidanceEngine {
     }
 
     func updateSceneHint(from concept: String) {
-        // 사용자가 입력한 컨셉 텍스트를 씬 타입으로 변환해
-        // 이후 규칙/모델 추론의 문맥 힌트로 활용
         let normalized = concept.lowercased()
 
         if normalized.contains("인물") || normalized.contains("portrait") {
@@ -459,14 +381,12 @@ final class CompositionGuidanceEngine {
         }
     }
 
-    func analyze(sampleBuffer: CMSampleBuffer) -> CompositionGuidanceResult? {
-        // 스케줄러가 허용한 시점에만 분석하여 발열/배터리 비용 제어
+    func analyze(sampleBuffer: CMSampleBuffer, devicePose: DevicePose = .neutral) -> CompositionGuidanceResult? {
+        // 성능/발열 관리를 위해 모든 프레임을 분석하지 않는다.
         guard scheduler.shouldRun() else { return nil }
-        guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else {
-            return nil
-        }
+        guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return nil }
 
-        // 프레임 피처 추출(얼굴 + 밝기 + 선명도 + 씬 힌트)
+        // Vision과 픽셀 기반 지표를 모아 현재 프레임의 상태를 만든다.
         let faceObservation = detectPrimaryFace(from: sampleBuffer)
         let visualSignals = detectSaliencyAndHorizon(from: sampleBuffer)
         let (brightness, sharpness) = estimateExposureAndSharpness(from: pixelBuffer)
@@ -476,30 +396,42 @@ final class CompositionGuidanceEngine {
             horizonAngle: visualSignals.horizonAngle,
             brightness: brightness,
             sharpness: sharpness,
-            sceneType: sceneHint
+            sceneType: sceneHint,
+            devicePose: devicePose
         )
-        let snapshot = snapshot(from: features)
+        // 컨셉 기반 sceneHint를 실제 목표 구도 프리셋으로 변환.
+        let target = CompositionTarget.preset(for: sceneHint)
+        // 현재 프레임이 목표 구도에서 얼마나 벗어났는지 계산.
+        let evaluation = evaluate(features: features, target: target)
+        let snapshot = snapshot(from: features, evaluation: evaluation)
 
-        // 모델 결과가 충분히 신뢰 가능하면 우선 사용
+        // 모델이 충분히 자신 있으면 모델 문구를 우선 사용한다.
         if let suggestion = modelService.suggestion(for: features), suggestion.confidence >= 0.55 {
             return CompositionGuidanceResult(
                 message: suggestion.message,
                 confidence: suggestion.confidence,
                 source: .model,
-                featureSnapshot: snapshot
+                featureSnapshot: snapshot,
+                evaluation: evaluation
             )
         }
 
-        // 모델이 없거나 신뢰도가 낮으면 규칙 기반 문구로 fallback
+        // 모델이 없거나 약하면 규칙 기반 correction을 문구로 사용한다.
+        let heuristic = stabilizedHeuristicDecision(
+            message: evaluation.primaryCorrection.message,
+            baseConfidence: calibratedConfidence(from: evaluation)
+        )
         return CompositionGuidanceResult(
-            message: heuristicGuidance(from: features),
-            confidence: 0.45,
+            message: heuristic.message,
+            confidence: heuristic.confidence,
             source: .heuristic,
-            featureSnapshot: snapshot
+            featureSnapshot: snapshot,
+            evaluation: evaluation
         )
     }
 
-    private func snapshot(from features: FrameFeatures) -> CompositionFeatureSnapshot {
+    private func snapshot(from features: FrameFeatures, evaluation: CompositionEvaluation) -> CompositionFeatureSnapshot {
+        // 나중에 오프라인 분석/학습에 활용할 수 있도록 평가 결과까지 함께 기록한다.
         CompositionFeatureSnapshot(
             faceDetected: features.faceObservation != nil,
             faceCenterX: features.faceObservation.map { Double($0.boundingBox.midX) },
@@ -510,7 +442,12 @@ final class CompositionGuidanceEngine {
             horizonAngle: features.horizonAngle,
             brightness: features.brightness,
             sharpness: features.sharpness,
-            sceneType: features.sceneType.rawValue
+            sceneType: features.sceneType.rawValue,
+            devicePitch: features.devicePose.pitch,
+            deviceRoll: features.devicePose.roll,
+            motionStable: features.devicePose.isStable,
+            overallScore: evaluation.overallScore,
+            readyToCapture: evaluation.isAcceptable
         )
     }
 
@@ -550,67 +487,215 @@ final class CompositionGuidanceEngine {
         }
     }
 
-    private func heuristicGuidance(from features: FrameFeatures) -> String {
-        // 인물이 검출되면 기존 구도 규칙(거리/좌우/상하) 우선 적용
-        if let face = features.faceObservation {
-            let bbox = face.boundingBox
-            let centerX = bbox.midX
-            let centerY = bbox.midY
-            let width = bbox.width
+    private func evaluate(features: FrameFeatures, target: CompositionTarget) -> CompositionEvaluation {
+        // target이 요구하는 대표 피사체를 현재 프레임에서 찾는다.
+        let subject = subjectState(for: features, target: target)
 
-            if width < 0.18 {
-                return "조금 더 가까이"
-            }
-            if width > 0.55 {
-                return "조금 더 멀리"
-            }
-            if centerX < 0.4 {
-                return "조금 더 오른쪽으로"
-            }
-            if centerX > 0.6 {
-                return "조금 더 왼쪽으로"
-            }
-            if centerY < 0.35 {
-                return "조금 더 아래로"
-            }
-            if centerY > 0.65 {
-                return "조금 더 위로"
-            }
-        } else if features.sceneType == .portrait || features.sceneType == .pet {
-            return "인물이 화면 안에 들어오도록 맞춰주세요."
+        // 대표 피사체를 못 찾으면 다른 보정보다 "피사체 찾기"가 최우선이다.
+        guard let subject else {
+            return CompositionEvaluation(
+                isAcceptable: false,
+                overallScore: 0.22,
+                xError: 1,
+                yError: 1,
+                sizeError: 1,
+                rollError: 0,
+                stabilityError: features.devicePose.isStable ? 0 : 0.6,
+                primaryCorrection: .findSubject
+            )
         }
 
-        // 풍경/도시 씬에서 수평 기울기를 먼저 보정
-        if let horizonAngle = features.horizonAngle, abs(horizonAngle) > 0.08 {
-            return "수평이 기울었어요. 화면의 수평선을 맞춰보세요."
-        }
+        let xError = distanceToRange(subject.centerX, target.targetX)
+        let yError = distanceToRange(subject.centerY, target.targetY)
+        let sizeError = target.targetSize.map { distanceToRange(subject.size, $0) } ?? 0
 
-        // Saliency 중심이 중앙에 너무 모이면 1/3 지점 배치를 유도
-        if let saliencyCenter = features.saliencyCenter,
-           features.sceneType == .landscape || features.sceneType == .cityStreet {
-            if (0.42...0.58).contains(saliencyCenter.x) {
-                return "주 피사체를 1/3 지점으로 옮겨보세요."
-            }
-            if saliencyCenter.x < 0.28 {
-                return "주 피사체가 왼쪽에 몰렸어요. 조금 오른쪽으로 이동해보세요."
-            }
-            if saliencyCenter.x > 0.72 {
-                return "주 피사체가 오른쪽에 몰렸어요. 조금 왼쪽으로 이동해보세요."
-            }
-        }
+        // Vision horizon이 있으면 우선 사용하고, 없으면 device roll을 fallback으로 사용.
+        let measuredRoll = features.horizonAngle ?? features.devicePose.roll
+        let rollMagnitude = abs(measuredRoll)
+        let rollError = max(0, rollMagnitude - target.allowedRoll) / max(0.01, 0.22 - target.allowedRoll)
 
-        // 인물이 없을 때는 밝기/선명도 기반 촬영 안정화 가이드 제공
+        // 흔들림은 motion 센서 기반, blur는 픽셀 sharpness 기반으로 본다.
+        let stabilityError = features.devicePose.isStable ? 0 : min(1.0, (features.devicePose.rotationRate / 0.5) + (features.devicePose.userAcceleration / 0.15))
+
+        let brightnessError: Double
         if features.brightness < 0.18 {
-            return "조명이 부족해요. 조금 더 밝은 방향으로 이동해보세요."
-        }
-        if features.brightness > 0.9 {
-            return "노출이 높아요. 밝은 영역을 화면 밖으로 조금 이동해보세요."
-        }
-        if features.sharpness < 0.03 {
-            return "손떨림이 감지돼요. 잠시 멈춘 뒤 촬영해보세요."
+            brightnessError = min(1.0, (0.18 - features.brightness) / 0.18)
+        } else if features.brightness > 0.9 {
+            brightnessError = min(1.0, (features.brightness - 0.9) / 0.1)
+        } else {
+            brightnessError = 0
         }
 
-        return "좋아요! 지금 구도 유지"
+        let sharpnessError = features.sharpness < 0.03 ? min(1.0, (0.03 - features.sharpness) / 0.03) : 0
+        let headroomError = headroomError(for: features, target: target)
+
+        // 각 오차를 가중합으로 합쳐 전체 score를 만든다.
+        let weightedError =
+            (xError * 0.23) +
+            (yError * 0.18) +
+            (sizeError * 0.18) +
+            (rollError * 0.18) +
+            (stabilityError * 0.13) +
+            (brightnessError * 0.05) +
+            (sharpnessError * 0.03) +
+            (headroomError * 0.02)
+
+        let overallScore = max(0, min(1, 1 - weightedError))
+        // 사용자에게는 가장 중요한 correction 하나만 알려준다.
+        let primaryCorrection = primaryCorrection(
+            subject: subject,
+            target: target,
+            rollError: rollError,
+            stabilityError: max(stabilityError, sharpnessError),
+            brightnessError: brightnessError,
+            isOverExposed: features.brightness > 0.9,
+            headroomError: headroomError
+        )
+        let isAcceptable = overallScore >= 0.80 && primaryCorrection == .none
+
+        return CompositionEvaluation(
+            isAcceptable: isAcceptable,
+            overallScore: overallScore,
+            xError: xError,
+            yError: yError,
+            sizeError: sizeError,
+            rollError: rollError,
+            stabilityError: max(stabilityError, sharpnessError),
+            primaryCorrection: primaryCorrection
+        )
+    }
+
+    private func subjectState(for features: FrameFeatures, target: CompositionTarget) -> (centerX: Double, centerY: Double, size: Double)? {
+        switch target.subjectKind {
+        case .face:
+            // 얼굴 중심 구도는 face bbox를 직접 사용.
+            guard let face = features.faceObservation else { return nil }
+            return (
+                centerX: Double(face.boundingBox.midX),
+                centerY: Double(face.boundingBox.midY),
+                size: Double(face.boundingBox.width)
+            )
+        case .salientObject:
+            // 풍경/음식 등은 saliency를 우선 사용하고, 없으면 face를 fallback으로 사용.
+            if let saliency = features.saliencyCenter {
+                let size = features.faceObservation.map { Double($0.boundingBox.width) } ?? 0.25
+                return (centerX: Double(saliency.x), centerY: Double(saliency.y), size: size)
+            }
+            if let face = features.faceObservation {
+                return (
+                    centerX: Double(face.boundingBox.midX),
+                    centerY: Double(face.boundingBox.midY),
+                    size: Double(face.boundingBox.width)
+                )
+            }
+            return nil
+        case .none:
+            // 특정 피사체가 없으면 화면 중앙을 기준값으로 둔다.
+            return (centerX: 0.5, centerY: 0.5, size: 0.3)
+        }
+    }
+
+    private func headroomError(for features: FrameFeatures, target: CompositionTarget) -> Double {
+        // 얼굴 기반 프리셋에서만 머리 위 여백을 평가한다.
+        guard let preferredHeadroom = target.preferredHeadroom,
+              let face = features.faceObservation else {
+            return 0
+        }
+        let headroom = Double(1 - face.boundingBox.maxY)
+        return distanceToRange(headroom, preferredHeadroom)
+    }
+
+    private func primaryCorrection(
+        subject: (centerX: Double, centerY: Double, size: Double),
+        target: CompositionTarget,
+        rollError: Double,
+        stabilityError: Double,
+        brightnessError: Double,
+        isOverExposed: Bool,
+        headroomError: Double
+    ) -> GuidanceCorrection {
+        // correction 우선순위는 "촬영 불가능한 큰 문제" -> "미세 구도 조정" 순서다.
+        if rollError > 0.18 {
+            return .levelHorizon
+        }
+        if stabilityError > 0.22 {
+            return .holdSteady
+        }
+        if brightnessError > 0.3 {
+            return isOverExposed ? .reduceHighlights : .brightenScene
+        }
+        if headroomError > 0.2 {
+            return .adjustHeadroom
+        }
+
+        if subject.centerX < target.targetX.lowerBound {
+            return .moveRight
+        }
+        if subject.centerX > target.targetX.upperBound {
+            return .moveLeft
+        }
+        if subject.centerY < target.targetY.lowerBound {
+            return .moveDown
+        }
+        if subject.centerY > target.targetY.upperBound {
+            return .moveUp
+        }
+
+        if let targetSize = target.targetSize {
+            if subject.size < targetSize.lowerBound {
+                return .moveCloser
+            }
+            if subject.size > targetSize.upperBound {
+                return .moveFarther
+            }
+        }
+
+        if target.prefersRuleOfThirds {
+            let nearestThird = nearestThirdDistance(subject.centerX)
+            // 1/3 구도를 선호하는 장면은 중앙에서 조금 벗어나도록 유도한다.
+            if nearestThird > 0.12 {
+                return subject.centerX < 0.5 ? .moveRight : .moveLeft
+            }
+        }
+
+        return .none
+    }
+
+    private func nearestThirdDistance(_ x: Double) -> Double {
+        // 1/3선(1/3, 2/3) 중 더 가까운 쪽까지의 거리.
+        min(abs(x - 1.0 / 3.0), abs(x - 2.0 / 3.0))
+    }
+
+    private func distanceToRange(_ value: Double, _ range: ClosedRange<Double>) -> Double {
+        // 범위 안이면 0, 밖이면 범위 폭 대비 얼마나 벗어났는지 0~1로 정규화.
+        if range.contains(value) { return 0 }
+        if value < range.lowerBound {
+            return min(1, (range.lowerBound - value) / max(0.0001, range.upperBound - range.lowerBound))
+        }
+        return min(1, (value - range.upperBound) / max(0.0001, range.upperBound - range.lowerBound))
+    }
+
+    private func calibratedConfidence(from evaluation: CompositionEvaluation) -> Double {
+        // score를 사람이 읽기 쉬운 confidence 범위로 보정.
+        let base = 0.48 + (evaluation.overallScore * 0.3)
+        if evaluation.primaryCorrection == .none {
+            return min(0.82, base)
+        }
+        return min(0.82, base + 0.04)
+    }
+
+    private func stabilizedHeuristicDecision(message: String, baseConfidence: Double) -> ModelSuggestion {
+        // 동일 문구가 반복되면 confidence를 조금 올려 UI 흔들림을 줄인다.
+        if message == lastHeuristicMessage {
+            heuristicRepeatCount += 1
+        } else {
+            lastHeuristicMessage = message
+            heuristicRepeatCount = 1
+        }
+
+        let boost = min(0.14, Double(max(0, heuristicRepeatCount - 1)) * 0.03)
+        let calibrated = min(0.82, baseConfidence + boost)
+        return ModelSuggestion(message: message, confidence: calibrated)
     }
 
     private func estimateExposureAndSharpness(from pixelBuffer: CVPixelBuffer) -> (brightness: Double, sharpness: Double) {
@@ -625,7 +710,6 @@ final class CompositionGuidanceEngine {
         let height = CVPixelBufferGetHeight(pixelBuffer)
         let bytesPerRow = CVPixelBufferGetBytesPerRow(pixelBuffer)
 
-        // 모든 픽셀을 보지 않고 stride 샘플링으로 계산 비용 절감
         let stride = 8
         let pointer = baseAddress.assumingMemoryBound(to: UInt8.self)
 
@@ -633,6 +717,7 @@ final class CompositionGuidanceEngine {
         var gradientSum = 0.0
         var sampleCount = 0
 
+        // 모든 픽셀을 다 읽지 않고 일정 stride 간격으로만 샘플링한다.
         for y in stride..<(height - stride) where y % stride == 0 {
             var previousLuma = 0.0
             for x in stride..<(width - stride) where x % stride == 0 {
@@ -640,12 +725,12 @@ final class CompositionGuidanceEngine {
                 let b = Double(pointer[offset])
                 let g = Double(pointer[offset + 1])
                 let r = Double(pointer[offset + 2])
-                // RGB -> luma 변환으로 밝기 계산
+                // RGB를 밝기(luma) 하나로 바꿔 평균 밝기를 구한다.
                 let luma = (0.114 * b + 0.587 * g + 0.299 * r) / 255.0
 
                 brightnessSum += luma
                 if sampleCount > 0 {
-                    // 인접 샘플의 밝기 차이를 선명도(에지 변화)로 근사
+                    // 인접 샘플 간 밝기 차이를 간단한 edge/선명도 지표로 사용.
                     gradientSum += abs(luma - previousLuma)
                 }
                 previousLuma = luma

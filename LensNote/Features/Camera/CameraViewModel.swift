@@ -31,6 +31,10 @@ final class CameraViewModel: NSObject, ObservableObject {
     @Published var conceptText: String = ""
     @Published var preset: FilterPreset? = nil
     @Published var guidanceMessage: String = "컨셉을 입력하면 구도 안내를 시작해요."
+    /// 현재 프레임이 목표 구도에 얼마나 가까운지 표시하는 점수.
+    @Published var guidanceScore: Double = 0.0
+    /// 지금 바로 촬영해도 되는지 여부.
+    @Published var readyToCapture: Bool = false
     @Published var isCameraAuthorized: Bool? = nil
     @Published var isCapturingPhoto: Bool = false
     @Published var cameraStatusMessage: String? = nil
@@ -43,6 +47,8 @@ final class CameraViewModel: NSObject, ObservableObject {
     private let photoOutput = AVCapturePhotoOutput()
     // 카메라 프레임 -> 구도 가이드 결과를 만드는 엔진
     private nonisolated(unsafe) let guidanceEngine = CompositionGuidanceEngine()
+    // CoreMotion에서 기기 자세를 받아오는 제공자.
+    private nonisolated(unsafe) let devicePoseProvider: DevicePoseProviding
     // 모델 학습/평가를 위한 프레임-가이드 샘플 기록기(JSONL)
     private let guidanceDatasetRecorder = GuidanceDatasetRecorder()
     private nonisolated(unsafe) var photoCaptureContinuation: CheckedContinuation<UIImage?, Never>?
@@ -60,8 +66,12 @@ final class CameraViewModel: NSObject, ObservableObject {
     private let repeatedGuidanceCooldown: TimeInterval = 1.4
     private let minimumGuidanceConfidence: Double = 0.42
 
-    init(savePhotoUseCase: SavePhotoUseCase) {
+    init(
+        savePhotoUseCase: SavePhotoUseCase,
+        devicePoseProvider: DevicePoseProviding = DevicePoseProvider()
+    ) {
         self.savePhotoUseCase = savePhotoUseCase
+        self.devicePoseProvider = devicePoseProvider
         super.init()
     }
 
@@ -84,6 +94,8 @@ final class CameraViewModel: NSObject, ObservableObject {
         cameraStatusMessage = nil
         // 카메라 재진입 시에도 현재 컨셉으로 힌트 재동기화
         guidanceEngine.updateSceneHint(from: conceptText)
+        // 세션과 함께 기기 자세 측정도 시작한다.
+        devicePoseProvider.start()
 
         await configureSessionIfNeeded()
         sessionQueue.async { [weak self] in
@@ -107,8 +119,12 @@ final class CameraViewModel: NSObject, ObservableObject {
                 self.isRunning = false
                 // 세션 종료 시 미확정 후보 문구 초기화
                 self.pendingGuidanceMessage = nil
+                // 세션이 멈추면 촬영 준비 상태도 초기화한다.
+                self.readyToCapture = false
             }
         }
+        // 프레임 분석과 함께 쓰던 motion 업데이트도 중지한다.
+        devicePoseProvider.stop()
     }
 
     func mockCaptureAndSave() {
@@ -284,7 +300,10 @@ extension CameraViewModel: AVCaptureVideoDataOutputSampleBufferDelegate {
         didOutput sampleBuffer: CMSampleBuffer,
         from connection: AVCaptureConnection
     ) {
-        guard let result = guidanceEngine.analyze(sampleBuffer: sampleBuffer) else { return }
+        // 현재 프레임 시점의 기기 자세를 함께 읽어온다.
+        let devicePose = devicePoseProvider.latestPose
+        // Vision 기반 feature와 motion 정보를 합쳐 최종 가이드를 만든다.
+        guard let result = guidanceEngine.analyze(sampleBuffer: sampleBuffer, devicePose: devicePose) else { return }
         Task { @MainActor [weak self] in
             // 고빈도 프레임 이벤트에서 바로 UI 반영하지 않고 안정화 로직 통과
             guard let self else { return }
@@ -296,6 +315,10 @@ extension CameraViewModel: AVCaptureVideoDataOutputSampleBufferDelegate {
 
 private extension CameraViewModel {
     func applyGuidanceResult(_ result: CompositionGuidanceResult) -> Bool {
+        // 메시지를 UI에 반영하기 전에 점수/촬영 가능 상태는 즉시 업데이트한다.
+        guidanceScore = result.evaluation.overallScore
+        readyToCapture = result.evaluation.isAcceptable
+
         // 신뢰도 낮은 결과는 사용자 혼란을 줄이기 위해 무시
         guard result.confidence >= minimumGuidanceConfidence else { return false }
 

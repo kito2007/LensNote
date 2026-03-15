@@ -419,6 +419,10 @@ struct CameraView: View {
                     .font(.footnote)
                     .foregroundStyle(.white.opacity(0.84))
                     .lineLimit(2)
+                // 점수와 촬영 가능 여부를 같이 보여줘서 현재 상태를 빠르게 이해하게 한다.
+                Text(viewModel.readyToCapture ? "촬영 준비 완료 · score \(Int(viewModel.guidanceScore * 100))" : "구도 조정 중 · score \(Int(viewModel.guidanceScore * 100))")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(viewModel.readyToCapture ? .green : .yellow)
             }
 
             Spacer()
