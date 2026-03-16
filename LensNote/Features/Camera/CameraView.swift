@@ -312,6 +312,14 @@ struct CameraView: View {
                     .allowsHitTesting(false)
             }
 
+            if let overlayState = viewModel.overlayState {
+                FramingGuideOverlay(state: overlayState)
+                    .ignoresSafeArea()
+                    .allowsHitTesting(false)
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 76)
+            }
+
             VStack(spacing: CameraDesign.itemSpacing) {
                 HStack {
                     backButton {
@@ -415,6 +423,11 @@ struct CameraView: View {
                 Text(viewModel.conceptText.isEmpty ? "Standard Mode" : viewModel.conceptText)
                     .font(.headline)
                     .foregroundStyle(.white)
+                if let profileName = viewModel.overlayState?.profileName {
+                    Text(profileName)
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.72))
+                }
                 Text("구도: \(viewModel.guidanceMessage)")
                     .font(.footnote)
                     .foregroundStyle(.white.opacity(0.84))
@@ -549,6 +562,97 @@ struct CameraView: View {
         Task { @MainActor in
             try? await Task.sleep(nanoseconds: 1_800_000_000)
             showSaveSuccess = false
+        }
+    }
+}
+
+/// 목표 구도 영역과 이동 방향을 프리뷰 위에 시각적으로 안내한다.
+private struct FramingGuideOverlay: View {
+    let state: GuidanceOverlayState
+
+    var body: some View {
+        GeometryReader { proxy in
+            let rect = rect(in: proxy.size)
+
+            ZStack(alignment: .topLeading) {
+                RoundedRectangle(cornerRadius: 28, style: .continuous)
+                    .strokeBorder(state.readyToCapture ? Color.green : Color.white.opacity(0.92), style: StrokeStyle(lineWidth: 2.5, dash: state.readyToCapture ? [] : [12, 8]))
+                    .frame(width: rect.width, height: rect.height)
+                    .position(x: rect.midX, y: rect.midY)
+
+                guideBadge
+                    .position(x: rect.minX + 86, y: max(20, rect.minY - 26))
+
+                if !state.readyToCapture, let symbol = correctionSymbol {
+                    Image(systemName: symbol)
+                        .font(.system(size: 26, weight: .bold))
+                        .foregroundStyle(Color.yellow)
+                        .position(arrowPosition(for: rect))
+                }
+            }
+        }
+    }
+
+    private var guideBadge: some View {
+        Text(state.profileName)
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(Color.black.opacity(0.48))
+            .clipShape(Capsule())
+    }
+
+    private var correctionSymbol: String? {
+        switch state.correction {
+        case .moveLeft:
+            return "arrow.left.circle.fill"
+        case .moveRight:
+            return "arrow.right.circle.fill"
+        case .moveUp, .adjustHeadroom:
+            return "arrow.up.circle.fill"
+        case .moveDown:
+            return "arrow.down.circle.fill"
+        case .moveCloser:
+            return "plus.magnifyingglass"
+        case .moveFarther:
+            return "minus.magnifyingglass"
+        case .levelHorizon:
+            return "arrow.left.and.right.righttriangle.left.righttriangle.right.fill"
+        case .holdSteady:
+            return "hand.raised.fill"
+        case .brightenScene:
+            return "sun.max.fill"
+        case .reduceHighlights:
+            return "sun.min.fill"
+        case .findSubject:
+            return "viewfinder"
+        case .none:
+            return nil
+        }
+    }
+
+    private func rect(in size: CGSize) -> CGRect {
+        CGRect(
+            x: state.targetRect.minX * size.width,
+            y: state.targetRect.minY * size.height,
+            width: state.targetRect.width * size.width,
+            height: state.targetRect.height * size.height
+        )
+    }
+
+    private func arrowPosition(for rect: CGRect) -> CGPoint {
+        switch state.correction {
+        case .moveLeft:
+            return CGPoint(x: rect.minX - 18, y: rect.midY)
+        case .moveRight:
+            return CGPoint(x: rect.maxX + 18, y: rect.midY)
+        case .moveUp, .adjustHeadroom:
+            return CGPoint(x: rect.midX, y: rect.minY - 18)
+        case .moveDown:
+            return CGPoint(x: rect.midX, y: rect.maxY + 18)
+        case .moveCloser, .moveFarther, .levelHorizon, .holdSteady, .brightenScene, .reduceHighlights, .findSubject, .none:
+            return CGPoint(x: rect.midX, y: rect.midY)
         }
     }
 }

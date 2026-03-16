@@ -67,6 +67,7 @@ struct CompositionFeatureSnapshot: Codable {
     let motionStable: Bool
     let overallScore: Double
     let readyToCapture: Bool
+    let targetProfileName: String
 }
 
 /// 한 프레임에서 추출한 Vision/픽셀/motion 신호 묶음.
@@ -350,6 +351,7 @@ final class CompositionGuidanceEngine {
     private let scheduler: GuidanceInferenceScheduler
     private let modelService: CompositionModelServing
     private var sceneHint: SceneType = .etc
+    private var conceptHint: String = ""
     private var lastHeuristicMessage: String = ""
     private var heuristicRepeatCount: Int = 0
 
@@ -362,6 +364,7 @@ final class CompositionGuidanceEngine {
     }
 
     func updateSceneHint(from concept: String) {
+        conceptHint = concept
         let normalized = concept.lowercased()
 
         if normalized.contains("인물") || normalized.contains("portrait") {
@@ -400,7 +403,7 @@ final class CompositionGuidanceEngine {
             devicePose: devicePose
         )
         // 컨셉 기반 sceneHint를 실제 목표 구도 프리셋으로 변환.
-        let target = CompositionTarget.preset(for: sceneHint)
+        let target = CompositionTarget.preset(for: conceptHint, sceneType: sceneHint)
         // 현재 프레임이 목표 구도에서 얼마나 벗어났는지 계산.
         let evaluation = evaluate(features: features, target: target)
         let snapshot = snapshot(from: features, evaluation: evaluation)
@@ -447,7 +450,8 @@ final class CompositionGuidanceEngine {
             deviceRoll: features.devicePose.roll,
             motionStable: features.devicePose.isStable,
             overallScore: evaluation.overallScore,
-            readyToCapture: evaluation.isAcceptable
+            readyToCapture: evaluation.isAcceptable,
+            targetProfileName: evaluation.target.name
         )
     }
 
@@ -501,7 +505,8 @@ final class CompositionGuidanceEngine {
                 sizeError: 1,
                 rollError: 0,
                 stabilityError: features.devicePose.isStable ? 0 : 0.6,
-                primaryCorrection: .findSubject
+                primaryCorrection: .findSubject,
+                target: target
             )
         }
 
@@ -561,7 +566,8 @@ final class CompositionGuidanceEngine {
             sizeError: sizeError,
             rollError: rollError,
             stabilityError: max(stabilityError, sharpnessError),
-            primaryCorrection: primaryCorrection
+            primaryCorrection: primaryCorrection,
+            target: target
         )
     }
 

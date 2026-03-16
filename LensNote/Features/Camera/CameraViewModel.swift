@@ -35,6 +35,8 @@ final class CameraViewModel: NSObject, ObservableObject {
     @Published var guidanceScore: Double = 0.0
     /// 지금 바로 촬영해도 되는지 여부.
     @Published var readyToCapture: Bool = false
+    /// 프리뷰 위에 그릴 타겟 프레임과 보정 방향 상태.
+    @Published var overlayState: GuidanceOverlayState? = nil
     @Published var isCameraAuthorized: Bool? = nil
     @Published var isCapturingPhoto: Bool = false
     @Published var cameraStatusMessage: String? = nil
@@ -121,6 +123,7 @@ final class CameraViewModel: NSObject, ObservableObject {
                 self.pendingGuidanceMessage = nil
                 // 세션이 멈추면 촬영 준비 상태도 초기화한다.
                 self.readyToCapture = false
+                self.overlayState = nil
             }
         }
         // 프레임 분석과 함께 쓰던 motion 업데이트도 중지한다.
@@ -318,6 +321,12 @@ private extension CameraViewModel {
         // 메시지를 UI에 반영하기 전에 점수/촬영 가능 상태는 즉시 업데이트한다.
         guidanceScore = result.evaluation.overallScore
         readyToCapture = result.evaluation.isAcceptable
+        overlayState = GuidanceOverlayState(
+            targetRect: result.evaluation.target.overlayRect,
+            correction: result.evaluation.primaryCorrection,
+            readyToCapture: result.evaluation.isAcceptable,
+            profileName: result.evaluation.target.name
+        )
 
         // 신뢰도 낮은 결과는 사용자 혼란을 줄이기 위해 무시
         guard result.confidence >= minimumGuidanceConfidence else { return false }

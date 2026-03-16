@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import CoreGraphics
 
 /// 현재 장면에서 "무엇을 대표 피사체로 볼지"를 정의한다.
 /// - face: 얼굴 바운딩 박스를 기준으로 구도 평가
@@ -20,6 +21,8 @@ enum SubjectKind {
 /// 장면별 목표 구도 프리셋.
 /// 이 구조체가 "사용자가 원하는 이상적인 프레임" 역할을 한다.
 struct CompositionTarget {
+    /// UI에 노출할 프리셋 이름.
+    let name: String
     /// 어떤 씬 프리셋에서 만들어졌는지 기록용 메타데이터.
     let sceneType: SceneType
     /// 어떤 종류의 피사체를 중심으로 평가할지.
@@ -36,6 +39,9 @@ struct CompositionTarget {
     let preferredHeadroom: ClosedRange<Double>?
     /// 풍경/도시처럼 1/3 구도를 적극 유도할지 여부.
     let prefersRuleOfThirds: Bool
+
+    /// 오버레이로 보여줄 목표 프레임의 정규화 사각형.
+    let overlayRect: CGRect
 }
 
 /// 한 번에 사용자에게 안내할 대표 보정 동작.
@@ -106,27 +112,61 @@ struct CompositionEvaluation {
     let stabilityError: Double
     /// 사용자에게 우선 안내할 보정 항목.
     let primaryCorrection: GuidanceCorrection
+    /// 현재 평가에 사용한 목표 프리셋.
+    let target: CompositionTarget
+}
+
+/// 현재 카메라 프리뷰에 그릴 수 있는 오버레이 상태.
+struct GuidanceOverlayState {
+    /// 목표 구도를 시각화하는 정규화 프레임.
+    let targetRect: CGRect
+    /// 지금 사용자에게 보여줄 대표 보정 방향.
+    let correction: GuidanceCorrection
+    /// 촬영 가능 상태인지.
+    let readyToCapture: Bool
+    /// 어떤 프리셋이 적용 중인지 사용자에게 보여줄 이름.
+    let profileName: String
 }
 
 extension CompositionTarget {
+    /// 컨셉 문자열에서 더 구체적인 촬영 의도를 찾아 프리셋을 결정한다.
+    static func preset(for concept: String, sceneType: SceneType) -> CompositionTarget {
+        let normalized = concept.lowercased()
+
+        if normalized.contains("셀카") || normalized.contains("selfie") {
+            return portraitSelfie
+        }
+        if normalized.contains("전신") || normalized.contains("full body") {
+            return fullBodyPortrait
+        }
+        if normalized.contains("반신") || normalized.contains("half body") || normalized.contains("허리") {
+            return halfBodyPortrait
+        }
+        if normalized.contains("클로즈업") || normalized.contains("closeup") || normalized.contains("근접") {
+            return closeUpPortrait
+        }
+        if normalized.contains("탑뷰") || normalized.contains("top view") || normalized.contains("flat lay") {
+            return topDownFood
+        }
+        if normalized.contains("스카이라인") || normalized.contains("skyline") {
+            return skylineLandscape
+        }
+        if normalized.contains("거리") || normalized.contains("street") || normalized.contains("도시") {
+            return cityWalk
+        }
+
+        return preset(for: sceneType)
+    }
+
     /// 컨셉에서 분류된 SceneType을 실제 목표 구도 값으로 확장한다.
     static func preset(for sceneType: SceneType) -> CompositionTarget {
         switch sceneType {
         case .portrait:
-            // 인물은 얼굴이 너무 치우치지 않고, 약간 위쪽에 오도록 설정.
-            return CompositionTarget(
-                sceneType: sceneType,
-                subjectKind: .face,
-                targetX: 0.38...0.62,
-                targetY: 0.42...0.60,
-                targetSize: 0.20...0.38,
-                allowedRoll: 0.08,
-                preferredHeadroom: 0.08...0.20,
-                prefersRuleOfThirds: false
-            )
+            return halfBodyPortrait
         case .pet:
             // 반려동물은 움직임이 많으므로 인물보다 허용 범위를 조금 넓힌다.
             return CompositionTarget(
+                name: "Pet Focus",
                 sceneType: sceneType,
                 subjectKind: .face,
                 targetX: 0.34...0.66,
@@ -134,47 +174,19 @@ extension CompositionTarget {
                 targetSize: 0.16...0.34,
                 allowedRoll: 0.10,
                 preferredHeadroom: 0.06...0.22,
-                prefersRuleOfThirds: false
+                prefersRuleOfThirds: false,
+                overlayRect: CGRect(x: 0.22, y: 0.22, width: 0.56, height: 0.50)
             )
         case .landscape:
-            // 풍경은 수평이 더 중요하고, 중앙보다 1/3 구도 유도를 선호한다.
-            return CompositionTarget(
-                sceneType: sceneType,
-                subjectKind: .salientObject,
-                targetX: 0.28...0.72,
-                targetY: 0.30...0.70,
-                targetSize: nil,
-                allowedRoll: 0.05,
-                preferredHeadroom: nil,
-                prefersRuleOfThirds: true
-            )
+            return skylineLandscape
         case .cityStreet:
-            // 도시/거리는 풍경과 유사하지만 피사체 위치 허용 범위를 조금 더 넓힌다.
-            return CompositionTarget(
-                sceneType: sceneType,
-                subjectKind: .salientObject,
-                targetX: 0.25...0.75,
-                targetY: 0.28...0.70,
-                targetSize: nil,
-                allowedRoll: 0.06,
-                preferredHeadroom: nil,
-                prefersRuleOfThirds: true
-            )
+            return cityWalk
         case .food:
-            // 음식은 중앙 정렬과 적당한 크기를 더 중요하게 본다.
-            return CompositionTarget(
-                sceneType: sceneType,
-                subjectKind: .salientObject,
-                targetX: 0.38...0.62,
-                targetY: 0.38...0.62,
-                targetSize: 0.22...0.60,
-                allowedRoll: 0.09,
-                preferredHeadroom: nil,
-                prefersRuleOfThirds: false
-            )
+            return topDownFood
         case .night:
             // 야경은 엄격한 수평 유지와 약한 1/3 구도를 같이 사용한다.
             return CompositionTarget(
+                name: "Night Street",
                 sceneType: sceneType,
                 subjectKind: .salientObject,
                 targetX: 0.30...0.70,
@@ -182,11 +194,13 @@ extension CompositionTarget {
                 targetSize: nil,
                 allowedRoll: 0.08,
                 preferredHeadroom: nil,
-                prefersRuleOfThirds: true
+                prefersRuleOfThirds: true,
+                overlayRect: CGRect(x: 0.16, y: 0.20, width: 0.68, height: 0.48)
             )
         case .etc:
             // 기본 프리셋은 너무 공격적이지 않은 중립 범위를 사용한다.
             return CompositionTarget(
+                name: "Balanced Frame",
                 sceneType: sceneType,
                 subjectKind: .salientObject,
                 targetX: 0.35...0.65,
@@ -194,8 +208,100 @@ extension CompositionTarget {
                 targetSize: nil,
                 allowedRoll: 0.09,
                 preferredHeadroom: nil,
-                prefersRuleOfThirds: false
+                prefersRuleOfThirds: false,
+                overlayRect: CGRect(x: 0.24, y: 0.20, width: 0.52, height: 0.52)
             )
         }
     }
+
+    private static let portraitSelfie = CompositionTarget(
+        name: "Selfie Close",
+        sceneType: .portrait,
+        subjectKind: .face,
+        targetX: 0.40...0.60,
+        targetY: 0.38...0.54,
+        targetSize: 0.26...0.42,
+        allowedRoll: 0.07,
+        preferredHeadroom: 0.08...0.18,
+        prefersRuleOfThirds: false,
+        overlayRect: CGRect(x: 0.27, y: 0.16, width: 0.46, height: 0.50)
+    )
+
+    private static let halfBodyPortrait = CompositionTarget(
+        name: "Portrait Half",
+        sceneType: .portrait,
+        subjectKind: .face,
+        targetX: 0.38...0.62,
+        targetY: 0.42...0.60,
+        targetSize: 0.20...0.38,
+        allowedRoll: 0.08,
+        preferredHeadroom: 0.08...0.20,
+        prefersRuleOfThirds: false,
+        overlayRect: CGRect(x: 0.24, y: 0.18, width: 0.52, height: 0.58)
+    )
+
+    private static let fullBodyPortrait = CompositionTarget(
+        name: "Portrait Full",
+        sceneType: .portrait,
+        subjectKind: .face,
+        targetX: 0.42...0.58,
+        targetY: 0.46...0.62,
+        targetSize: 0.10...0.20,
+        allowedRoll: 0.08,
+        preferredHeadroom: 0.10...0.24,
+        prefersRuleOfThirds: false,
+        overlayRect: CGRect(x: 0.30, y: 0.10, width: 0.40, height: 0.74)
+    )
+
+    private static let closeUpPortrait = CompositionTarget(
+        name: "Portrait Close",
+        sceneType: .portrait,
+        subjectKind: .face,
+        targetX: 0.40...0.60,
+        targetY: 0.40...0.56,
+        targetSize: 0.30...0.48,
+        allowedRoll: 0.07,
+        preferredHeadroom: 0.06...0.16,
+        prefersRuleOfThirds: false,
+        overlayRect: CGRect(x: 0.26, y: 0.14, width: 0.48, height: 0.54)
+    )
+
+    private static let topDownFood = CompositionTarget(
+        name: "Food Top View",
+        sceneType: .food,
+        subjectKind: .salientObject,
+        targetX: 0.42...0.58,
+        targetY: 0.40...0.60,
+        targetSize: 0.28...0.62,
+        allowedRoll: 0.06,
+        preferredHeadroom: nil,
+        prefersRuleOfThirds: false,
+        overlayRect: CGRect(x: 0.20, y: 0.20, width: 0.60, height: 0.60)
+    )
+
+    private static let skylineLandscape = CompositionTarget(
+        name: "Landscape Wide",
+        sceneType: .landscape,
+        subjectKind: .salientObject,
+        targetX: 0.28...0.72,
+        targetY: 0.34...0.62,
+        targetSize: nil,
+        allowedRoll: 0.05,
+        preferredHeadroom: nil,
+        prefersRuleOfThirds: true,
+        overlayRect: CGRect(x: 0.12, y: 0.24, width: 0.76, height: 0.36)
+    )
+
+    private static let cityWalk = CompositionTarget(
+        name: "City Walk",
+        sceneType: .cityStreet,
+        subjectKind: .salientObject,
+        targetX: 0.25...0.75,
+        targetY: 0.28...0.70,
+        targetSize: nil,
+        allowedRoll: 0.06,
+        preferredHeadroom: nil,
+        prefersRuleOfThirds: true,
+        overlayRect: CGRect(x: 0.16, y: 0.18, width: 0.68, height: 0.48)
+    )
 }
