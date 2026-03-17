@@ -68,6 +68,17 @@ struct CompositionFeatureSnapshot: Codable {
     let overallScore: Double
     let readyToCapture: Bool
     let targetProfileName: String
+    /// 평가 시점에 엔진이 사용한 실제 피사체 위치.
+    let detectedRectX: Double?
+    let detectedRectY: Double?
+    let detectedRectWidth: Double?
+    let detectedRectHeight: Double?
+    /// 규칙/threshold 튜닝용 오차 항목들.
+    let xError: Double
+    let yError: Double
+    let sizeError: Double
+    let rollError: Double
+    let stabilityError: Double
 }
 
 /// 한 프레임에서 추출한 Vision/픽셀/motion 신호 묶음.
@@ -451,7 +462,16 @@ final class CompositionGuidanceEngine {
             motionStable: features.devicePose.isStable,
             overallScore: evaluation.overallScore,
             readyToCapture: evaluation.isAcceptable,
-            targetProfileName: evaluation.target.name
+            targetProfileName: evaluation.target.name,
+            detectedRectX: evaluation.detectedSubjectRect?.origin.x,
+            detectedRectY: evaluation.detectedSubjectRect?.origin.y,
+            detectedRectWidth: evaluation.detectedSubjectRect?.width,
+            detectedRectHeight: evaluation.detectedSubjectRect?.height,
+            xError: evaluation.xError,
+            yError: evaluation.yError,
+            sizeError: evaluation.sizeError,
+            rollError: evaluation.rollError,
+            stabilityError: evaluation.stabilityError
         )
     }
 
@@ -506,7 +526,8 @@ final class CompositionGuidanceEngine {
                 rollError: 0,
                 stabilityError: features.devicePose.isStable ? 0 : 0.6,
                 primaryCorrection: .findSubject,
-                target: target
+                target: target,
+                detectedSubjectRect: nil
             )
         }
 
@@ -567,8 +588,34 @@ final class CompositionGuidanceEngine {
             rollError: rollError,
             stabilityError: max(stabilityError, sharpnessError),
             primaryCorrection: primaryCorrection,
-            target: target
+            target: target,
+            detectedSubjectRect: detectedRect(for: features, target: target)
         )
+    }
+
+    private func detectedRect(for features: FrameFeatures, target: CompositionTarget) -> CGRect? {
+        switch target.subjectKind {
+        case .face:
+            // 얼굴 중심 프리셋은 face bounding box를 그대로 사용한다.
+            return features.faceObservation?.boundingBox
+        case .salientObject:
+            if let saliency = features.saliencyCenter {
+                // saliency는 중심점만 있으므로, 대략적인 보기용 rect를 만들어 오버레이에 쓴다.
+                let fallbackWidth = features.faceObservation?.boundingBox.width ?? 0.28
+                let fallbackHeight = features.faceObservation?.boundingBox.height ?? 0.28
+                return CGRect(
+                    x: max(0, min(1 - fallbackWidth, saliency.x - (fallbackWidth / 2))),
+                    y: max(0, min(1 - fallbackHeight, saliency.y - (fallbackHeight / 2))),
+                    width: fallbackWidth,
+                    height: fallbackHeight
+                )
+            }
+            // saliency가 없으면 face bbox라도 fallback으로 보여준다.
+            return features.faceObservation?.boundingBox
+        case .none:
+            // 특정 피사체가 없는 프리셋은 중앙 기준 상자를 사용한다.
+            return CGRect(x: 0.35, y: 0.35, width: 0.3, height: 0.3)
+        }
     }
 
     private func subjectState(for features: FrameFeatures, target: CompositionTarget) -> (centerX: Double, centerY: Double, size: Double)? {

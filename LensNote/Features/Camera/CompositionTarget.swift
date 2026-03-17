@@ -114,18 +114,43 @@ struct CompositionEvaluation {
     let primaryCorrection: GuidanceCorrection
     /// 현재 평가에 사용한 목표 프리셋.
     let target: CompositionTarget
+    /// 현재 프레임에서 대표 피사체로 판단한 정규화 사각형.
+    /// 오버레이에서 "지금 피사체가 어디에 잡혔는지"를 그릴 때 사용한다.
+    let detectedSubjectRect: CGRect?
 }
 
 /// 현재 카메라 프리뷰에 그릴 수 있는 오버레이 상태.
 struct GuidanceOverlayState {
     /// 목표 구도를 시각화하는 정규화 프레임.
     let targetRect: CGRect
+    /// 현재 감지된 피사체 프레임. 감지 실패 시 nil.
+    /// targetRect와 비교해 사용자가 어느 방향으로 움직여야 하는지 보여준다.
+    let detectedRect: CGRect?
     /// 지금 사용자에게 보여줄 대표 보정 방향.
     let correction: GuidanceCorrection
     /// 촬영 가능 상태인지.
     let readyToCapture: Bool
     /// 어떤 프리셋이 적용 중인지 사용자에게 보여줄 이름.
     let profileName: String
+    /// 튜닝용 정량 지표.
+    /// 실기기에서 threshold를 조정할 때 바로 참고할 수 있게 UI로 넘긴다.
+    let metrics: GuidanceDebugMetrics
+}
+
+/// 실기기에서 threshold를 조정할 때 참고할 디버그 숫자들.
+struct GuidanceDebugMetrics {
+    /// 전체 준비도 점수.
+    let score: Double
+    /// 좌우 위치 오차.
+    let xError: Double
+    /// 상하 위치 오차.
+    let yError: Double
+    /// 피사체 크기 오차.
+    let sizeError: Double
+    /// 수평/기울기 오차.
+    let rollError: Double
+    /// 흔들림/불안정성 오차.
+    let stabilityError: Double
 }
 
 extension CompositionTarget {

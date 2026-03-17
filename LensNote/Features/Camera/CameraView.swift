@@ -313,6 +313,8 @@ struct CameraView: View {
             }
 
             if let overlayState = viewModel.overlayState {
+                // 목표 프레임과 현재 감지 프레임을 함께 그려
+                // 사용자가 왜 현재 가이드를 받는지 바로 이해할 수 있게 한다.
                 FramingGuideOverlay(state: overlayState)
                     .ignoresSafeArea()
                     .allowsHitTesting(false)
@@ -436,6 +438,12 @@ struct CameraView: View {
                 Text(viewModel.readyToCapture ? "촬영 준비 완료 · score \(Int(viewModel.guidanceScore * 100))" : "구도 조정 중 · score \(Int(viewModel.guidanceScore * 100))")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(viewModel.readyToCapture ? .green : .yellow)
+                if let metrics = viewModel.overlayState?.metrics {
+                    Text(debugSummary(metrics))
+                        .font(.caption2.monospacedDigit())
+                        .foregroundStyle(.white.opacity(0.65))
+                        .lineLimit(2)
+                }
             }
 
             Spacer()
@@ -564,6 +572,17 @@ struct CameraView: View {
             showSaveSuccess = false
         }
     }
+
+    private func debugSummary(_ metrics: GuidanceDebugMetrics) -> String {
+        String(
+            format: "x %.2f  y %.2f  size %.2f  roll %.2f  stab %.2f",
+            metrics.xError,
+            metrics.yError,
+            metrics.sizeError,
+            metrics.rollError,
+            metrics.stabilityError
+        )
+    }
 }
 
 /// 목표 구도 영역과 이동 방향을 프리뷰 위에 시각적으로 안내한다.
@@ -572,23 +591,43 @@ private struct FramingGuideOverlay: View {
 
     var body: some View {
         GeometryReader { proxy in
-            let rect = rect(in: proxy.size)
+            let targetRect = rect(from: state.targetRect, in: proxy.size)
+            let detectedRect = state.detectedRect.map { rect(from: $0, in: proxy.size) }
 
             ZStack(alignment: .topLeading) {
+                // 목표 구도 프레임.
                 RoundedRectangle(cornerRadius: 28, style: .continuous)
                     .strokeBorder(state.readyToCapture ? Color.green : Color.white.opacity(0.92), style: StrokeStyle(lineWidth: 2.5, dash: state.readyToCapture ? [] : [12, 8]))
-                    .frame(width: rect.width, height: rect.height)
-                    .position(x: rect.midX, y: rect.midY)
+                    .frame(width: targetRect.width, height: targetRect.height)
+                    .position(x: targetRect.midX, y: targetRect.midY)
+
+                if let detectedRect {
+                    // 현재 감지된 피사체 프레임.
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .strokeBorder(Color.cyan.opacity(0.95), style: StrokeStyle(lineWidth: 2))
+                        .frame(width: detectedRect.width, height: detectedRect.height)
+                        .position(x: detectedRect.midX, y: detectedRect.midY)
+                }
 
                 guideBadge
-                    .position(x: rect.minX + 86, y: max(20, rect.minY - 26))
+                    .position(x: targetRect.minX + 86, y: max(20, targetRect.minY - 26))
+
+                if let detectedRect {
+                    detectedBadge
+                        .position(x: detectedRect.minX + 78, y: detectedRect.maxY + 18)
+                }
 
                 if !state.readyToCapture, let symbol = correctionSymbol {
+                    // 지금 가장 중요한 correction을 아이콘 하나로 강조한다.
                     Image(systemName: symbol)
                         .font(.system(size: 26, weight: .bold))
                         .foregroundStyle(Color.yellow)
-                        .position(arrowPosition(for: rect))
+                        .position(arrowPosition(for: targetRect))
                 }
+
+                // 실기기 threshold 조정용 수치 패널.
+                metricsPanel
+                    .position(x: proxy.size.width - 96, y: 48)
             }
         }
     }
@@ -601,6 +640,41 @@ private struct FramingGuideOverlay: View {
             .padding(.vertical, 8)
             .background(Color.black.opacity(0.48))
             .clipShape(Capsule())
+    }
+
+    private var detectedBadge: some View {
+        Text("Live")
+            .font(.caption2.weight(.bold))
+            .foregroundStyle(Color.cyan)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(Color.black.opacity(0.55))
+            .clipShape(Capsule())
+    }
+
+    private var metricsPanel: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            metricRow("score", state.metrics.score)
+            metricRow("x", state.metrics.xError)
+            metricRow("y", state.metrics.yError)
+            metricRow("size", state.metrics.sizeError)
+            metricRow("roll", state.metrics.rollError)
+            metricRow("stab", state.metrics.stabilityError)
+        }
+        .font(.caption2.monospacedDigit())
+        .foregroundStyle(.white.opacity(0.86))
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(Color.black.opacity(0.42))
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+
+    private func metricRow(_ label: String, _ value: Double) -> some View {
+        HStack(spacing: 6) {
+            Text(label)
+                .foregroundStyle(.white.opacity(0.55))
+            Text(String(format: "%.2f", value))
+        }
     }
 
     private var correctionSymbol: String? {
@@ -632,12 +706,13 @@ private struct FramingGuideOverlay: View {
         }
     }
 
-    private func rect(in size: CGSize) -> CGRect {
+    private func rect(from normalizedRect: CGRect, in size: CGSize) -> CGRect {
+        // 엔진은 0~1 정규화 좌표를 쓰므로 실제 프리뷰 크기로 환산한다.
         CGRect(
-            x: state.targetRect.minX * size.width,
-            y: state.targetRect.minY * size.height,
-            width: state.targetRect.width * size.width,
-            height: state.targetRect.height * size.height
+            x: normalizedRect.minX * size.width,
+            y: normalizedRect.minY * size.height,
+            width: normalizedRect.width * size.width,
+            height: normalizedRect.height * size.height
         )
     }
 

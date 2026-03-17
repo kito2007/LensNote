@@ -321,11 +321,21 @@ private extension CameraViewModel {
         // 메시지를 UI에 반영하기 전에 점수/촬영 가능 상태는 즉시 업데이트한다.
         guidanceScore = result.evaluation.overallScore
         readyToCapture = result.evaluation.isAcceptable
+        // 엔진의 평가 결과를 프리뷰 오버레이가 바로 그릴 수 있는 형태로 변환한다.
         overlayState = GuidanceOverlayState(
             targetRect: result.evaluation.target.overlayRect,
+            detectedRect: result.evaluation.detectedSubjectRect,
             correction: result.evaluation.primaryCorrection,
             readyToCapture: result.evaluation.isAcceptable,
-            profileName: result.evaluation.target.name
+            profileName: result.evaluation.target.name,
+            metrics: GuidanceDebugMetrics(
+                score: result.evaluation.overallScore,
+                xError: result.evaluation.xError,
+                yError: result.evaluation.yError,
+                sizeError: result.evaluation.sizeError,
+                rollError: result.evaluation.rollError,
+                stabilityError: result.evaluation.stabilityError
+            )
         )
 
         // 신뢰도 낮은 결과는 사용자 혼란을 줄이기 위해 무시
