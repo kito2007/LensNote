@@ -69,7 +69,15 @@ struct CameraView: View {
             case .photo:
                 referenceStep
             case .text:
-                conceptStep
+                CameraConceptStepView(
+                        conceptInput: $conceptInput,
+                        onBack: { step = .select },
+                        onStartCamera: {
+                            viewModel.conceptText = conceptInput
+                            viewModel.applyConcept()
+                            step = .camera
+                        }
+                    )
             case .manual:
                 manualStep
             case .camera:
@@ -151,41 +159,6 @@ struct CameraView: View {
         }
         .padding(CameraDesign.screenPadding)
         .foregroundStyle(.white)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.black)
-    }
-
-    private var conceptStep: some View {
-        VStack(alignment: .leading, spacing: CameraDesign.sectionSpacing) {
-            HStack {
-                backButton { step = .select }
-                Spacer()
-            }
-
-            Text("컨셉 입력")
-                .font(.system(size: 22, weight: .semibold))
-                .foregroundStyle(.white)
-
-            TextField("예: 야경, 인물, 풍경", text: $conceptInput)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .padding(14)
-                .background(Color.white.opacity(0.12))
-                .clipShape(RoundedRectangle(cornerRadius: CameraDesign.cardRadius, style: .continuous))
-                .foregroundStyle(.white)
-
-            Button("카메라 시작") {
-                viewModel.conceptText = conceptInput
-                viewModel.applyConcept()
-                step = .camera
-            }
-            .buttonStyle(PrimaryCameraButtonStyle())
-            .disabled(conceptInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            .opacity(conceptInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.5 : 1)
-
-            Spacer()
-        }
-        .padding(CameraDesign.screenPadding)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.black)
     }
@@ -752,47 +725,6 @@ private struct AssistCell: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.white.opacity(0.08))
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-    }
-}
-
-private struct PrimaryCameraButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.system(size: 17, weight: .semibold))
-            .foregroundStyle(.white)
-            .frame(maxWidth: .infinity, minHeight: 54)
-            .background(
-                LinearGradient(
-                    colors: [Color(red: 0.15, green: 0.41, blue: 0.98), Color(red: 0.08, green: 0.80, blue: 0.87)],
-                    startPoint: .leading,
-                    endPoint: .trailing
-                )
-            )
-            .clipShape(RoundedRectangle(cornerRadius: CameraDesign.buttonRadius, style: .continuous))
-            .opacity(configuration.isPressed ? 0.86 : 1)
-    }
-}
-
-private struct SecondaryCameraButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.system(size: 17, weight: .semibold))
-            .foregroundStyle(.white)
-            .frame(maxWidth: .infinity, minHeight: 54)
-            .background(Color.white.opacity(0.12))
-            .clipShape(RoundedRectangle(cornerRadius: CameraDesign.buttonRadius, style: .continuous))
-            .opacity(configuration.isPressed ? 0.86 : 1)
-    }
-}
-
-private struct HeaderIconButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .foregroundStyle(.white)
-            .frame(width: 36, height: 36)
-            .background(Color.black.opacity(0.48))
-            .clipShape(Circle())
-            .opacity(configuration.isPressed ? 0.8 : 1)
     }
 }
 
