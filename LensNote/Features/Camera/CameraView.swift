@@ -60,7 +60,12 @@ struct CameraView: View {
         ZStack {
             switch step {
             case .select:
-                selectionStep
+                CameraSelectionStepView(
+                    onSelectPhoto: { step = .photo},
+                    onSelectText: {step = .text},
+                    onSelectManual: {step = .manual},
+                    onSelectCamera: {step = .camera}
+                )
             case .photo:
                 referenceStep
             case .text:
@@ -97,67 +102,6 @@ struct CameraView: View {
         } message: {
             Text("설정에서 카메라 접근을 허용해주세요.")
         }
-    }
-
-    private var selectionStep: some View {
-        VStack(alignment: .leading, spacing: CameraDesign.sectionSpacing) {
-            Spacer(minLength: 0)
-
-            VStack(alignment: .leading, spacing: 8) {
-                Text("LensNote Camera")
-                    .font(.system(size: 34, weight: .bold))
-                    .foregroundStyle(.white)
-                Text("촬영 전 입력 방식을 선택하고 AI 어시스트를 시작하세요.")
-                    .font(.system(size: 17, weight: .regular))
-                    .foregroundStyle(.white.opacity(0.82))
-            }
-
-            VStack(spacing: CameraDesign.itemSpacing) {
-                modeButton(
-                    title: "레퍼런스 사진 분석",
-                    subtitle: "사진 톤을 분석해 추천값을 생성",
-                    tint: .blue
-                ) {
-                    step = .photo
-                }
-
-                modeButton(
-                    title: "텍스트 컨셉 입력",
-                    subtitle: "원하는 스타일 키워드로 시작",
-                    tint: .cyan
-                ) {
-                    step = .text
-                }
-
-                modeButton(
-                    title: "수동 설정",
-                    subtitle: "필터 값을 직접 조정",
-                    tint: .mint
-                ) {
-                    step = .manual
-                }
-
-                modeButton(
-                    title: "카메라 바로 시작",
-                    subtitle: "기본값으로 즉시 촬영",
-                    tint: .white
-                ) {
-                    step = .camera
-                }
-            }
-            .padding(.top, 8)
-
-            Spacer(minLength: 0)
-        }
-        .padding(CameraDesign.screenPadding)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(
-            LinearGradient(
-                colors: [Color(red: 0.09, green: 0.12, blue: 0.19), Color(red: 0.05, green: 0.35, blue: 0.43)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        )
     }
 
     private var referenceStep: some View {
