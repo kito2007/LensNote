@@ -21,11 +21,11 @@ private enum CameraInputMode: String {
 
 /// Camera 화면 공통 디자인 상수.
 struct CameraDesign {
-    static let screenPadding: CGFloat = 16
-    static let cardRadius: CGFloat = 14
-    static let buttonRadius: CGFloat = 22
-    static let sectionSpacing: CGFloat = 16
-    static let itemSpacing: CGFloat = 12
+    static let screenPadding: CGFloat = LensNoteTheme.Spacing.sm
+    static let cardRadius: CGFloat = LensNoteTheme.Radius.card
+    static let buttonRadius: CGFloat = LensNoteTheme.Radius.button
+    static let sectionSpacing: CGFloat = LensNoteTheme.Spacing.sm
+    static let itemSpacing: CGFloat = LensNoteTheme.Spacing.xs
 }
 
 /// 카메라 탭 메인 화면.

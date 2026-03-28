@@ -1,0 +1,87 @@
+//
+//  LensNoteTheme.swift
+//  LensNote
+//
+//  Created by Codex on 3/28/26.
+//
+
+import SwiftUI
+
+enum LensNoteTheme {
+    enum Colors {
+        static let surface = Color(red: 0.07, green: 0.07, blue: 0.08)
+        static let surfaceLow = Color(red: 0.11, green: 0.11, blue: 0.13)
+        static let surfaceHigh = Color(red: 0.17, green: 0.17, blue: 0.20)
+        static let surfaceHighest = Color(red: 0.22, green: 0.22, blue: 0.26)
+
+        static let textPrimary = Color.white
+        static let textSecondary = Color.white.opacity(0.82)
+        static let textTertiary = Color.white.opacity(0.68)
+
+        static let primary = Color(red: 0.24, green: 0.56, blue: 1.0)
+        static let tertiary = Color(red: 0.91, green: 0.70, blue: 1.0)
+        static let accentCyan = Color(red: 0.39, green: 0.87, blue: 1.0)
+
+        static let success = Color(red: 0.33, green: 0.86, blue: 0.53)
+        static let warning = Color(red: 0.98, green: 0.82, blue: 0.30)
+        static let danger = Color(red: 1.0, green: 0.42, blue: 0.42)
+
+        static let glassOverlay = surface.opacity(0.70)
+        static let cardOverlay = Color.white.opacity(0.08)
+        static let cardOverlayStrong = Color.white.opacity(0.14)
+    }
+
+    enum Gradients {
+        static let hero = LinearGradient(
+            colors: [Colors.primary, Colors.tertiary],
+            startPoint: .bottomLeading,
+            endPoint: .topTrailing
+        )
+
+        static let cameraBackground = LinearGradient(
+            colors: [Colors.surface, Color(red: 0.05, green: 0.20, blue: 0.28)],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+
+        static let activeDock = LinearGradient(
+            colors: [Colors.primary, Colors.tertiary],
+            startPoint: .leading,
+            endPoint: .trailing
+        )
+    }
+
+    enum Typography {
+        static let heroTitle = Font.system(size: 30, weight: .black)
+        static let sectionTitle = Font.system(size: 24, weight: .bold)
+        static let cardTitle = Font.system(size: 20, weight: .bold)
+        static let title = Font.system(size: 18, weight: .semibold)
+        static let body = Font.system(size: 14, weight: .medium)
+        static let bodyStrong = Font.system(size: 14, weight: .semibold)
+        static let microLabel = Font.system(size: 11, weight: .semibold)
+        static let technical = Font.system(size: 11, weight: .medium, design: .monospaced)
+    }
+
+    enum Radius {
+        static let card: CGFloat = 16
+        static let cardLarge: CGFloat = 28
+        static let button: CGFloat = 22
+        static let dock: CGFloat = 32
+        static let capsule: CGFloat = 999
+    }
+
+    enum Spacing {
+        static let xxxs: CGFloat = 4
+        static let xxs: CGFloat = 8
+        static let xs: CGFloat = 12
+        static let sm: CGFloat = 16
+        static let md: CGFloat = 20
+        static let lg: CGFloat = 24
+        static let xl: CGFloat = 32
+    }
+
+    enum Shadow {
+        static let ambient = Color.black.opacity(0.28)
+        static let elevated = Color.black.opacity(0.25)
+    }
+}

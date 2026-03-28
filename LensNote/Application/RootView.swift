@@ -28,5 +28,6 @@ struct RootView: View {
                 await mapVM.loadPhotoPinsIfNeeded()
             }
         }
+        .tint(LensNoteTheme.Colors.primary)
     }
 }
