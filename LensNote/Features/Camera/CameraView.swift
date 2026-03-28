@@ -107,7 +107,19 @@ struct CameraView: View {
             case .camera:
                 liveCameraStep
             case .result:
-                captureResultStep
+                CameraCaptureResultStepView(
+                    capturedImage: capturedImage,
+                    lastSaved: viewModel.lastSaved,
+                    errorMessage: viewModel.errorMessage,
+                    onBack: { step = .camera },
+                    onRetake: { step = .camera },
+                    onSave: {
+                        guard let capturedImage else { return }
+                        viewModel.saveCapturedImage(capturedImage)
+                        showTransientSuccess()
+                        step = .camera
+                    }
+                )
             }
             
             if showSaveSuccess {
@@ -204,70 +216,6 @@ struct CameraView: View {
                     .padding(.bottom, CameraDesign.screenPadding)
             }
         }
-    }
-    
-    private var captureResultStep: some View {
-        VStack(spacing: CameraDesign.sectionSpacing) {
-            HStack {
-                backButton { step = .camera }
-                Spacer()
-            }
-            
-            Spacer()
-            
-            RoundedRectangle(cornerRadius: 28, style: .continuous)
-                .fill(Color.white.opacity(0.08))
-                .overlay {
-                    if let capturedImage {
-                        Image(uiImage: capturedImage)
-                            .resizable()
-                            .scaledToFill()
-                    } else {
-                        VStack(spacing: 8) {
-                            Image(systemName: "photo")
-                                .font(.system(size: 44, weight: .medium))
-                            Text("Captured Preview")
-                                .font(.headline)
-                                .foregroundStyle(.white.opacity(0.86))
-                        }
-                    }
-                }
-                .frame(height: 320)
-                .clipped()
-            
-            HStack(spacing: 12) {
-                Button("다시 찍기") {
-                    step = .camera
-                }
-                .buttonStyle(SecondaryCameraButtonStyle())
-                
-                Button("저장하기") {
-                    guard let capturedImage else { return }
-                    viewModel.saveCapturedImage(capturedImage)
-                    showTransientSuccess()
-                    step = .camera
-                }
-                .buttonStyle(PrimaryCameraButtonStyle())
-            }
-            
-            if let saved = viewModel.lastSaved {
-                Text("Saved: \(saved.id.uuidString.prefix(8))...")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
-            
-            if let err = viewModel.errorMessage {
-                Text("Error: \(err)")
-                    .font(.footnote)
-                    .foregroundStyle(.red)
-            }
-            
-            Spacer()
-        }
-        .foregroundStyle(.white)
-        .padding(CameraDesign.screenPadding)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.black)
     }
     
     private var captureBar: some View {
