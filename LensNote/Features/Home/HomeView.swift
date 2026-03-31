@@ -2,8 +2,6 @@
 //  HomeView.swift
 //  LensNote
 //
-//  Created by Codex on 3/29/26.
-//
 
 import SwiftUI
 
@@ -12,15 +10,20 @@ struct HomeView: View {
     let onOpenCamera: () -> Void
     let onOpenMapGallery: () -> Void
 
+    // TODO: 실제 유저 프로필 연동 시 ViewModel로 교체
+    private let userName = "Julian"
+    private let userLocation = "Oslo, Norway"
+
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: LensNoteTheme.Spacing.lg) {
                     topBar
-                    introSection
+                    greetingSection
                     heroCard
-                    quickActionsSection
-                    pendingSectionsPlaceholder
+                    quickShotCard
+                    capturedMomentsSection
+                    recentSessionsSection
                 }
                 .padding(.horizontal, LensNoteTheme.Spacing.lg)
                 .padding(.vertical, LensNoteTheme.Spacing.xl)
@@ -29,6 +32,8 @@ struct HomeView: View {
             .toolbar(.hidden, for: .navigationBar)
         }
     }
+
+    // MARK: - Top Bar
 
     private var topBar: some View {
         HStack {
@@ -56,36 +61,35 @@ struct HomeView: View {
         .padding(.vertical, LensNoteTheme.Spacing.xxs)
     }
 
-    private var introSection: some View {
-        VStack(alignment: .leading, spacing: LensNoteTheme.Spacing.xs) {
-            Text(Date.now.formatted(date: .abbreviated, time: .omitted))
+    // MARK: - Greeting
+
+    private var greetingSection: some View {
+        VStack(alignment: .leading, spacing: LensNoteTheme.Spacing.xxxs) {
+            Text(Date.now.formatted(date: .abbreviated, time: .omitted).uppercased())
                 .font(LensNoteTheme.Typography.microLabel)
                 .foregroundStyle(LensNoteTheme.Colors.textTertiary)
-                .textCase(.uppercase)
+                .tracking(0.8)
 
-            Text("오늘의 촬영을 시작해볼까요")
-                .font(LensNoteTheme.Typography.heroTitle)
+            Text("Hi, \(userName)")
+                .font(.system(size: 30, weight: .black))
                 .foregroundStyle(LensNoteTheme.Colors.textPrimary)
 
-            Label("카메라, 레퍼런스 분석, 기록 탐색을 한 화면에서 시작", systemImage: "location.north.line")
+            Label(userLocation, systemImage: "location.fill")
                 .font(LensNoteTheme.Typography.body)
-                .foregroundStyle(LensNoteTheme.Colors.textSecondary)
+                .foregroundStyle(LensNoteTheme.Colors.textTertiary)
         }
     }
+
+    // MARK: - Hero Card
 
     private var heroCard: some View {
         Button(action: onUploadReference) {
             ZStack(alignment: .topTrailing) {
                 LensNoteTheme.Gradients.hero
-                    .overlay {
-                        RoundedRectangle(cornerRadius: LensNoteTheme.Radius.cardLarge, style: .continuous)
-                            .fill(.white.opacity(0.08))
-                            .blur(radius: 12)
-                    }
 
                 Image(systemName: "sparkles")
-                    .font(.system(size: 100, weight: .light))
-                    .foregroundStyle(.white.opacity(0.16))
+                    .font(.system(size: 100, weight: .ultraLight))
+                    .foregroundStyle(.white.opacity(0.14))
                     .padding(.top, LensNoteTheme.Spacing.lg)
                     .padding(.trailing, LensNoteTheme.Spacing.md)
 
@@ -93,6 +97,7 @@ struct HomeView: View {
                     Text("AI POWERED")
                         .font(LensNoteTheme.Typography.microLabel)
                         .foregroundStyle(.white.opacity(0.86))
+                        .tracking(0.6)
                         .padding(.horizontal, LensNoteTheme.Spacing.xs)
                         .padding(.vertical, LensNoteTheme.Spacing.xxs)
                         .background(.white.opacity(0.18))
@@ -103,7 +108,7 @@ struct HomeView: View {
                             .font(.system(size: 38, weight: .black))
                             .foregroundStyle(.white)
 
-                        Text("레퍼런스 이미지를 업로드하면 LensNote가 촬영 방향과 무드 설정의 시작점을 잡아줍니다.")
+                        Text("레퍼런스 사진을 업로드하면 LensNote가 카메라 설정과 구도 방향의 시작점을 잡아줍니다.")
                             .font(LensNoteTheme.Typography.body)
                             .foregroundStyle(.white.opacity(0.84))
                             .frame(maxWidth: 220, alignment: .leading)
@@ -121,94 +126,193 @@ struct HomeView: View {
                 .frame(maxWidth: .infinity, minHeight: 280, alignment: .leading)
             }
             .clipShape(RoundedRectangle(cornerRadius: LensNoteTheme.Radius.cardLarge, style: .continuous))
-            .shadow(color: LensNoteTheme.Shadow.elevated, radius: 32, y: 16)
+            .shadow(color: LensNoteTheme.Colors.primary.opacity(0.30), radius: 32, y: 16)
         }
         .buttonStyle(.plain)
     }
 
-    private var quickActionsSection: some View {
-        VStack(spacing: LensNoteTheme.Spacing.sm) {
-            quickActionCard(
-                title: "Quick Shot",
-                subtitle: "즉시 촬영 흐름으로 이동",
-                description: "빠르게 카메라를 열고 현재 장면을 바로 캡처",
-                icon: "camera.fill",
-                actionTitle: "Open Camera",
-                action: onOpenCamera
-            )
+    // MARK: - Quick Shot Card
 
-            quickActionCard(
-                title: "Map Gallery",
-                subtitle: "촬영 기록 탐색으로 이동",
-                description: "저장된 결과와 위치 기록을 한 번에 훑어보기",
-                icon: "map.fill",
-                actionTitle: "Open Gallery",
-                action: onOpenMapGallery
-            )
+    private var quickShotCard: some View {
+        Button(action: onOpenCamera) {
+            HStack(spacing: LensNoteTheme.Spacing.md) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(LensNoteTheme.Colors.primary.opacity(0.18))
+
+                    Image(systemName: "camera.fill")
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundStyle(LensNoteTheme.Colors.primary)
+                }
+                .frame(width: 52, height: 52)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Quick Shot")
+                        .font(LensNoteTheme.Typography.cardTitle)
+                        .foregroundStyle(LensNoteTheme.Colors.textPrimary)
+
+                    Text("즉시 촬영 흐름으로 이동")
+                        .font(LensNoteTheme.Typography.body)
+                        .foregroundStyle(LensNoteTheme.Colors.textTertiary)
+                }
+
+                Spacer()
+
+                Text("Open Camera")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(LensNoteTheme.Colors.primary)
+                    .padding(.horizontal, LensNoteTheme.Spacing.sm)
+                    .padding(.vertical, 8)
+                    .background(LensNoteTheme.Colors.primary.opacity(0.14))
+                    .clipShape(Capsule())
+            }
+            .padding(LensNoteTheme.Spacing.lg)
+            .background(LensNoteTheme.Colors.surfaceHigh)
+            .clipShape(RoundedRectangle(cornerRadius: LensNoteTheme.Radius.cardLarge, style: .continuous))
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - Captured Moments
+
+    private var capturedMomentsSection: some View {
+        VStack(alignment: .leading, spacing: LensNoteTheme.Spacing.sm) {
+            Text("Captured Moments")
+                .font(LensNoteTheme.Typography.title)
+                .foregroundStyle(LensNoteTheme.Colors.textPrimary)
+
+            // TODO: 실제 사진 데이터 연동 시 PhotoRepository로 교체
+            capturedMomentCard
         }
     }
 
-    private var pendingSectionsPlaceholder: some View {
-        Text("다음 커밋에서 Captured Moments, Recent Sessions 섹션 추가 예정")
-            .font(LensNoteTheme.Typography.body)
-            .foregroundStyle(LensNoteTheme.Colors.textTertiary)
-            .padding(LensNoteTheme.Spacing.md)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(LensNoteTheme.Colors.surfaceHigh)
-            .clipShape(RoundedRectangle(cornerRadius: LensNoteTheme.Radius.card, style: .continuous))
-    }
+    private var capturedMomentCard: some View {
+        ZStack(alignment: .bottomLeading) {
+            LinearGradient(
+                colors: [
+                    Color(red: 0.10, green: 0.18, blue: 0.35),
+                    Color(red: 0.05, green: 0.08, blue: 0.18)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
 
-    private func quickActionCard(
-        title: String,
-        subtitle: String,
-        description: String,
-        icon: String,
-        actionTitle: String,
-        action: @escaping () -> Void
-    ) -> some View {
-        VStack(alignment: .leading, spacing: LensNoteTheme.Spacing.md) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(LensNoteTheme.Colors.primary.opacity(0.20))
+            Image(systemName: "photo.on.rectangle.angled")
+                .font(.system(size: 64, weight: .ultraLight))
+                .foregroundStyle(.white.opacity(0.12))
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
 
-                Image(systemName: icon)
-                    .font(.system(size: 18, weight: .bold))
-                    .foregroundStyle(LensNoteTheme.Colors.primary)
-            }
-            .frame(width: 48, height: 48)
-
-            VStack(alignment: .leading, spacing: LensNoteTheme.Spacing.xxxs) {
-                Text(title)
-                    .font(LensNoteTheme.Typography.cardTitle)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("아직 캡처된 사진이 없습니다")
+                    .font(LensNoteTheme.Typography.bodyStrong)
                     .foregroundStyle(LensNoteTheme.Colors.textPrimary)
 
-                Text(subtitle)
-                    .font(LensNoteTheme.Typography.bodyStrong)
-                    .foregroundStyle(LensNoteTheme.Colors.textSecondary)
-
-                Text(description)
+                Text("카메라로 첫 촬영을 시작해보세요")
                     .font(LensNoteTheme.Typography.body)
                     .foregroundStyle(LensNoteTheme.Colors.textTertiary)
             }
-
-            Button(actionTitle, action: action)
-                .font(.system(size: 15, weight: .bold))
-                .foregroundStyle(LensNoteTheme.Colors.primary)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 14)
-                .background(LensNoteTheme.Colors.surfaceHighest)
-                .overlay {
-                    RoundedRectangle(cornerRadius: LensNoteTheme.Radius.button, style: .continuous)
-                        .stroke(LensNoteTheme.Colors.primary.opacity(0.18), lineWidth: 1)
-                }
-                .clipShape(RoundedRectangle(cornerRadius: LensNoteTheme.Radius.button, style: .continuous))
+            .padding(LensNoteTheme.Spacing.lg)
         }
-        .padding(LensNoteTheme.Spacing.lg)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(LensNoteTheme.Colors.surfaceHigh)
-        .clipShape(RoundedRectangle(cornerRadius: LensNoteTheme.Radius.cardLarge, style: .continuous))
+        .frame(height: 140)
+        .clipShape(RoundedRectangle(cornerRadius: LensNoteTheme.Radius.card, style: .continuous))
+    }
+
+    // MARK: - Recent Sessions
+
+    private var recentSessionsSection: some View {
+        VStack(alignment: .leading, spacing: LensNoteTheme.Spacing.sm) {
+            HStack {
+                Text("Recent Sessions")
+                    .font(LensNoteTheme.Typography.title)
+                    .foregroundStyle(LensNoteTheme.Colors.textPrimary)
+
+                Spacer()
+
+                Text("SEE ALL")
+                    .font(LensNoteTheme.Typography.microLabel)
+                    .foregroundStyle(LensNoteTheme.Colors.primary)
+                    .tracking(0.6)
+            }
+
+            // TODO: 실제 세션 데이터 연동 시 SessionRepository로 교체
+            VStack(spacing: 0) {
+                ForEach(RecentSession.mockData) { session in
+                    recentSessionRow(session)
+
+                    if session.id != RecentSession.mockData.last?.id {
+                        Divider()
+                            .background(LensNoteTheme.Colors.surfaceHighest)
+                            .padding(.leading, 68)
+                    }
+                }
+            }
+            .background(LensNoteTheme.Colors.surfaceHigh)
+            .clipShape(RoundedRectangle(cornerRadius: LensNoteTheme.Radius.card, style: .continuous))
+        }
+    }
+
+    private func recentSessionRow(_ session: RecentSession) -> some View {
+        HStack(spacing: LensNoteTheme.Spacing.md) {
+            ZStack {
+                Circle()
+                    .fill(session.accentColor.opacity(0.20))
+
+                Image(systemName: "camera.fill")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(session.accentColor)
+            }
+            .frame(width: 44, height: 44)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(session.title)
+                    .font(LensNoteTheme.Typography.bodyStrong)
+                    .foregroundStyle(LensNoteTheme.Colors.textPrimary)
+                    .lineLimit(1)
+
+                Text(session.dateLabel)
+                    .font(LensNoteTheme.Typography.microLabel)
+                    .foregroundStyle(LensNoteTheme.Colors.textTertiary)
+            }
+
+            Spacer()
+
+            HStack(spacing: 4) {
+                Text("\(session.matchPercent)%")
+                    .font(.system(size: 12, weight: .black))
+                    .foregroundStyle(session.accentColor)
+
+                Text("MATCH")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(LensNoteTheme.Colors.textTertiary)
+                    .tracking(0.4)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(session.accentColor.opacity(0.14))
+            .clipShape(Capsule())
+        }
+        .padding(.horizontal, LensNoteTheme.Spacing.lg)
+        .padding(.vertical, LensNoteTheme.Spacing.sm)
     }
 }
+
+// MARK: - Mock Data
+
+private struct RecentSession: Identifiable {
+    let id = UUID()
+    let title: String
+    let dateLabel: String
+    let matchPercent: Int
+    let accentColor: Color
+
+    static let mockData: [RecentSession] = [
+        RecentSession(title: "Morning Fog in Norway", dateLabel: "오늘 · 4장", matchPercent: 87, accentColor: LensNoteTheme.Colors.primary),
+        RecentSession(title: "Åker Brygge Nightscape", dateLabel: "3월 29일 · 9장", matchPercent: 95, accentColor: LensNoteTheme.Colors.tertiary),
+        RecentSession(title: "Golden Hour Rooftop", dateLabel: "3월 27일 · 6장", matchPercent: 72, accentColor: LensNoteTheme.Colors.accentCyan),
+    ]
+}
+
+// MARK: - Preview
 
 #Preview {
     HomeView(
