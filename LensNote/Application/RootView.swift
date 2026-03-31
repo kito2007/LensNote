@@ -8,14 +8,7 @@
 import SwiftUI
 
 /// 앱 최상위 탭 컨테이너.
-/// 홈을 허브로 두고 Camera / Map Gallery로 이동하는 3탭 구조를 사용한다.
 struct RootView: View {
-    private enum AppTab: Hashable {
-        case home
-        case camera
-        case map
-    }
-
     let cameraVM: CameraViewModel
     @StateObject private var mapVM = MapViewModel()
     @State private var selectedTab: AppTab = .home
