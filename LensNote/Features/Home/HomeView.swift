@@ -26,7 +26,8 @@ struct HomeView: View {
                     recentSessionsSection
                 }
                 .padding(.horizontal, LensNoteTheme.Spacing.lg)
-                .padding(.vertical, LensNoteTheme.Spacing.xl)
+                .padding(.top, LensNoteTheme.Spacing.xl)
+                .padding(.bottom, LensNoteTheme.Spacing.dockTotalClearance)
             }
             .background(LensNoteTheme.Colors.surface.ignoresSafeArea())
             .toolbar(.hidden, for: .navigationBar)

@@ -586,7 +586,7 @@ struct MapView: View {
                 }
                 .transition(.move(edge: .bottom).combined(with: .opacity))
                 .padding(.horizontal, 16)
-                .padding(.bottom, 12)
+                .padding(.bottom, LensNoteTheme.Spacing.dockTotalClearance)
             }
         }
     }
