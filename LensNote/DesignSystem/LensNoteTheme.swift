@@ -9,17 +9,18 @@ import SwiftUI
 
 enum LensNoteTheme {
     enum Colors {
-        static let surface = Color(red: 0.07, green: 0.07, blue: 0.08)
-        static let surfaceLow = Color(red: 0.11, green: 0.11, blue: 0.13)
-        static let surfaceHigh = Color(red: 0.17, green: 0.17, blue: 0.20)
-        static let surfaceHighest = Color(red: 0.22, green: 0.22, blue: 0.26)
+        // Midnight Obsidian surface hierarchy — depth via tonal layering, no borders
+        static let surface = Color(red: 0.0745, green: 0.0745, blue: 0.0824)   // #131315
+        static let surfaceLow = Color(red: 0.098, green: 0.098, blue: 0.110)
+        static let surfaceHigh = Color(red: 0.145, green: 0.145, blue: 0.165)
+        static let surfaceHighest = Color(red: 0.200, green: 0.200, blue: 0.230)
 
         static let textPrimary = Color.white
         static let textSecondary = Color.white.opacity(0.82)
         static let textTertiary = Color.white.opacity(0.68)
 
-        static let primary = Color(red: 0.24, green: 0.56, blue: 1.0)
-        static let tertiary = Color(red: 0.91, green: 0.70, blue: 1.0)
+        static let primary = Color(red: 0.0, green: 0.478, blue: 1.0)          // #007AFF Apple System Blue
+        static let tertiary = Color(red: 0.914, green: 0.702, blue: 1.0)       // #E9B3FF luminous violet
         static let accentCyan = Color(red: 0.39, green: 0.87, blue: 1.0)
 
         static let success = Color(red: 0.33, green: 0.86, blue: 0.53)
@@ -32,6 +33,7 @@ enum LensNoteTheme {
     }
 
     enum Gradients {
+        // Signature AI/magic gradient: Primary → Tertiary (blue-to-violet)
         static let hero = LinearGradient(
             colors: [Colors.primary, Colors.tertiary],
             startPoint: .bottomLeading,
