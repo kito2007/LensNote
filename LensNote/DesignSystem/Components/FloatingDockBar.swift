@@ -17,51 +17,43 @@ struct FloatingDockBar: View {
     private let activePillHeight: CGFloat = 32
 
     var body: some View {
-        ZStack(alignment: .top) {
-            // Layer 1: Bar pill (Home / Map / Profile buttons)
-            barPill
+        ZStack(alignment: .bottom) {
+            // Layer 1: Bar pill background — always 68pt tall, pinned to bottom
+            barBackground
 
-            // Layer 2: Camera button elevated above the pill
-            cameraButtonOverlay
+            // Layer 2: All 4 buttons in a single HStack
+            // Camera button uses negative offset to float above the bar
+            HStack(alignment: .bottom, spacing: 0) {
+                regularButton(.home)
+                cameraButton
+                regularButton(.map)
+                regularButton(.profile)
+            }
+            .frame(height: barHeight + cameraElevation)
         }
         .frame(height: barHeight + cameraElevation)
     }
 
-    // MARK: - Bar Pill
+    // MARK: - Bar Background
 
-    private var barPill: some View {
-        HStack(alignment: .center, spacing: 0) {
-            regularButton(.home)
-            cameraButtonPlaceholder   // empty space to reserve camera slot
-            regularButton(.map)
-            regularButton(.profile)
-        }
-        .frame(height: barHeight)
-        .background {
-            RoundedRectangle(cornerRadius: LensNoteTheme.Radius.dock, style: .continuous)
-                .fill(.ultraThinMaterial)
-                .overlay {
-                    RoundedRectangle(cornerRadius: LensNoteTheme.Radius.dock, style: .continuous)
-                        .fill(LensNoteTheme.Colors.surfaceLow.opacity(0.55))
-                }
-                .overlay {
-                    RoundedRectangle(cornerRadius: LensNoteTheme.Radius.dock, style: .continuous)
-                        .strokeBorder(Color.white.opacity(0.08), lineWidth: 1)
-                }
-        }
-        .shadow(color: .black.opacity(0.40), radius: 24, x: 0, y: 8)
-        .frame(maxHeight: .infinity, alignment: .bottom)
+    private var barBackground: some View {
+        RoundedRectangle(cornerRadius: LensNoteTheme.Radius.dock, style: .continuous)
+            .fill(.ultraThinMaterial)
+            .overlay {
+                RoundedRectangle(cornerRadius: LensNoteTheme.Radius.dock, style: .continuous)
+                    .fill(LensNoteTheme.Colors.surfaceLow.opacity(0.55))
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: LensNoteTheme.Radius.dock, style: .continuous)
+                    .strokeBorder(Color.white.opacity(0.08), lineWidth: 1)
+            }
+            .frame(height: barHeight)
+            .shadow(color: .black.opacity(0.40), radius: 24, x: 0, y: 8)
     }
 
-    // Invisible spacer matching camera button slot width
-    private var cameraButtonPlaceholder: some View {
-        Color.clear
-            .frame(width: cameraButtonSize, height: barHeight)
-    }
+    // MARK: - Camera Button (elevated)
 
-    // MARK: - Camera Button
-
-    private var cameraButtonOverlay: some View {
+    private var cameraButton: some View {
         Button {
             withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                 selectedTab = .camera
@@ -83,9 +75,11 @@ struct FloatingDockBar: View {
                     .font(.system(size: 24, weight: .semibold))
                     .foregroundStyle(.white)
             }
+            // 버튼 탭 영역은 bar 내 position에 유지하면서 시각적으로만 위로 돌출
+            .offset(y: -cameraElevation)
         }
         .buttonStyle(.plain)
-        .frame(maxWidth: .infinity, alignment: .top)
+        .frame(maxWidth: .infinity)
     }
 
     // MARK: - Regular Button
@@ -120,6 +114,7 @@ struct FloatingDockBar: View {
                     .foregroundStyle(isActive ? LensNoteTheme.Colors.textPrimary : LensNoteTheme.Colors.textTertiary)
             }
             .frame(maxWidth: .infinity)
+            .padding(.bottom, 8)
         }
         .buttonStyle(.plain)
     }
