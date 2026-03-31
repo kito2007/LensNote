@@ -80,6 +80,9 @@ enum LensNoteTheme {
         static let md: CGFloat = 20
         static let lg: CGFloat = 24
         static let xl: CGFloat = 32
+
+        // Floating dock bar clearance (bar 68 + elevation 14 + bottom padding 24 + buffer 10)
+        static let dockTotalClearance: CGFloat = 116
     }
 
     enum Shadow {
