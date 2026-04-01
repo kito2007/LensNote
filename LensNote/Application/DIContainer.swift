@@ -15,12 +15,19 @@ final class DIContainer {
     let savePhotoUseCase: SavePhotoUseCase
 
     init() {
-        self.photoRepository = LocalPhotoRepository()
+        self.photoRepository = FilePhotoRepository()
         self.savePhotoUseCase = SavePhotoUseCase(repository: photoRepository)
     }
 
     /// Camera 탭에서 사용할 ViewModel 팩토리.
     func makeCameraViewModel() -> CameraViewModel {
         CameraViewModel(savePhotoUseCase: savePhotoUseCase)
+    }
+
+    /// Map 탭에서 사용할 ViewModel 팩토리.
+    /// FetchPhotoPinsUseCase를 주입하여 LensNote 저장 사진을 지도에 표시할 수 있게 한다.
+    func makeMapViewModel() -> MapViewModel {
+        let fetchUseCase = FetchPhotoPinsUseCase(repository: photoRepository)
+        return MapViewModel(fetchPhotoPinsUseCase: fetchUseCase)
     }
 }
