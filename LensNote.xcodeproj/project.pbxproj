@@ -257,6 +257,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSCameraUsageDescription = "촬영을 위해 카메라 접근이 필요합니다.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "LensNote가 촬영 위치를 기록해 지도에 사진을 표시하는 데 사용합니다.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "사진을 지도에 표시하기 위해 사진 보관함 접근이 필요합니다.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -291,6 +292,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSCameraUsageDescription = "촬영을 위해 카메라 접근이 필요합니다.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "LensNote가 촬영 위치를 기록해 지도에 사진을 표시하는 데 사용합니다.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "사진을 지도에 표시하기 위해 사진 보관함 접근이 필요합니다.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
