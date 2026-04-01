@@ -149,9 +149,22 @@ struct CameraView: View {
                 successToast
                     .transition(.move(edge: .top).combined(with: .opacity))
             }
+
+            if viewModel.hasLocationWarning {
+                locationWarningToast
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
         }
         .animation(.easeInOut(duration: 0.25), value: step)
         .animation(.spring(response: 0.35, dampingFraction: 0.86), value: showSaveSuccess)
+        .animation(.spring(response: 0.35, dampingFraction: 0.86), value: viewModel.hasLocationWarning)
+        .onChange(of: viewModel.hasLocationWarning) { _, isWarning in
+            guard isWarning else { return }
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 2_500_000_000)
+                viewModel.hasLocationWarning = false
+            }
+        }
         .task(id: step) {
             // 카메라 단계에서만 AVCaptureSession을 실행하고, 나머지 단계에서는 중지한다.
             if step == .camera {
@@ -182,6 +195,36 @@ struct CameraView: View {
         .padding(.vertical, 10)
         .background(.ultraThinMaterial)
         .clipShape(Capsule())
+        .padding(.top, 60)
+        .frame(maxHeight: .infinity, alignment: .top)
+    }
+
+    private var locationWarningToast: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "location.slash.fill")
+                .foregroundStyle(LensNoteTheme.Colors.warning)
+                .font(.system(size: 16, weight: .semibold))
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("위치 정보 없이 저장됐어요")
+                    .font(LensNoteTheme.Typography.bodyStrong)
+                    .foregroundStyle(LensNoteTheme.Colors.textPrimary)
+                Text("이 사진은 지도에 표시되지 않습니다.")
+                    .font(LensNoteTheme.Typography.microLabel)
+                    .foregroundStyle(LensNoteTheme.Colors.textTertiary)
+            }
+        }
+        .padding(.horizontal, LensNoteTheme.Spacing.sm)
+        .padding(.vertical, LensNoteTheme.Spacing.xs)
+        .background(
+            ZStack {
+                LensNoteTheme.Colors.surfaceHigh
+                Color.clear.background(.ultraThinMaterial)
+            }
+        )
+        .clipShape(RoundedRectangle(cornerRadius: LensNoteTheme.Radius.card, style: .continuous))
+        .shadow(color: LensNoteTheme.Shadow.ambient, radius: 12, y: 4)
+        .padding(.horizontal, LensNoteTheme.Spacing.sm)
         .padding(.top, 60)
         .frame(maxHeight: .infinity, alignment: .top)
     }
