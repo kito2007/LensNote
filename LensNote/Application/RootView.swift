@@ -11,8 +11,15 @@ import SwiftUI
 /// TabView는 콘텐츠 전환만 담당하고, FloatingDockBar가 탭 내비게이션을 처리한다.
 struct RootView: View {
     let cameraVM: CameraViewModel
-    @StateObject private var mapVM = MapViewModel()
+    let container: DIContainer
+    @StateObject private var mapVM: MapViewModel
     @State private var selectedTab: AppTab = .home
+
+    init(cameraVM: CameraViewModel, container: DIContainer) {
+        self.cameraVM = cameraVM
+        self.container = container
+        _mapVM = StateObject(wrappedValue: container.makeMapViewModel())
+    }
 
     var body: some View {
         ZStack(alignment: .bottom) {

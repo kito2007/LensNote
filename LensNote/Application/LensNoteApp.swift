@@ -24,7 +24,7 @@ struct LensNoteApp: App {
     
     var body: some Scene {
         WindowGroup {
-            RootView(cameraVM: cameraVM)
+            RootView(cameraVM: cameraVM, container: container)
         }
     }
 }
