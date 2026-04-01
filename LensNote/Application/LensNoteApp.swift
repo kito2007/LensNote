@@ -16,13 +16,15 @@ struct LensNoteApp: App {
     private let cameraVM: CameraViewModel
     
     init(){
+        // 첫 렌더 전에 숨겨야 native tab bar flash가 발생하지 않음
+        UITabBar.appearance().isHidden = true
         self.container = DIContainer()
         self.cameraVM = container.makeCameraViewModel()
     }
     
     var body: some Scene {
         WindowGroup {
-            RootView(cameraVM: cameraVM)
+            RootView(cameraVM: cameraVM, container: container)
         }
     }
 }

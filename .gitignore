@@ -9,3 +9,7 @@
 # Xcode build outputs
 DerivedData/
 build/
+
+# XcodeBuildMCP local artifacts
+.xcodebuildmcp/DerivedData/
+.xcodebuildmcp/artifacts/

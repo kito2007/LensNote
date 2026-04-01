@@ -1,0 +1,23 @@
+schemaVersion: 1
+
+enabledWorkflows:
+  - simulator
+  - ui-automation
+  - logging
+
+disableSessionDefaults: false
+incrementalBuildsEnabled: false
+debug: false
+sentryDisabled: true
+uiDebuggerGuardMode: "error"
+
+sessionDefaults:
+  projectPath: "./LensNote.xcodeproj"
+  scheme: "LensNote"
+  configuration: "Debug"
+  platform: "iOS"
+  useLatestOS: true
+  arch: "arm64"
+  suppressWarnings: true
+  derivedDataPath: "./.xcodebuildmcp/DerivedData"
+  bundleId: "com.PTY.LensNote"

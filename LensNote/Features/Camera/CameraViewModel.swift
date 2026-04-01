@@ -24,6 +24,7 @@ struct FilterPreset: Equatable {
 @MainActor
 final class CameraViewModel: NSObject, ObservableObject {
     private let savePhotoUseCase: SavePhotoUseCase
+    private let locationProvider: LocationProvider
 
     @Published var lastSaved: PhotoItem? = nil
     @Published var errorMessage: String? = nil
@@ -40,6 +41,8 @@ final class CameraViewModel: NSObject, ObservableObject {
     @Published var isCameraAuthorized: Bool? = nil
     @Published var isCapturingPhoto: Bool = false
     @Published var cameraStatusMessage: String? = nil
+    /// 위치 정보 없이 사진이 저장됐을 때 true — 토스트 표시 후 false로 리셋된다.
+    @Published var hasLocationWarning: Bool = false
 
     let session = AVCaptureSession()
 
@@ -70,10 +73,12 @@ final class CameraViewModel: NSObject, ObservableObject {
 
     init(
         savePhotoUseCase: SavePhotoUseCase,
-        devicePoseProvider: DevicePoseProviding = DevicePoseProvider()
+        devicePoseProvider: DevicePoseProviding? = nil,
+        locationProvider: LocationProvider? = nil
     ) {
         self.savePhotoUseCase = savePhotoUseCase
-        self.devicePoseProvider = devicePoseProvider
+        self.devicePoseProvider = devicePoseProvider ?? DevicePoseProvider()
+        self.locationProvider = locationProvider ?? LocationProvider()
         super.init()
     }
 
@@ -96,8 +101,9 @@ final class CameraViewModel: NSObject, ObservableObject {
         cameraStatusMessage = nil
         // 카메라 재진입 시에도 현재 컨셉으로 힌트 재동기화
         guidanceEngine.updateSceneHint(from: conceptText)
-        // 세션과 함께 기기 자세 측정도 시작한다.
+        // 세션과 함께 기기 자세 측정 및 위치 업데이트도 시작한다.
         devicePoseProvider.start()
+        locationProvider.start()
 
         await configureSessionIfNeeded()
         sessionQueue.async { [weak self] in
@@ -128,6 +134,8 @@ final class CameraViewModel: NSObject, ObservableObject {
         }
         // 프레임 분석과 함께 쓰던 motion 업데이트도 중지한다.
         devicePoseProvider.stop()
+        // 카메라 세션 종료 시 위치 업데이트도 중지한다.
+        locationProvider.stop()
     }
 
     func mockCaptureAndSave() {
@@ -176,12 +184,19 @@ final class CameraViewModel: NSObject, ObservableObject {
         }
     }
 
+    /// 촬영된 이미지를 저장한다.
+    /// coordinate 파라미터가 nil이면 LocationProvider의 최신 좌표를 자동으로 사용한다.
+    /// 위치 정보를 전혀 구할 수 없으면 위치 없이 저장하고 hasLocationWarning을 true로 설정한다.
     func saveCapturedImage(_ image: UIImage, coordinate: GeoCoordinate? = nil) {
+        let resolvedCoordinate = coordinate ?? locationProvider.latestCoordinate
         do {
             let filePath = try persistImageToDocuments(image)
-            let saved = try savePhotoUseCase.execute(imagePath: filePath, coordinate: coordinate)
+            let saved = try savePhotoUseCase.execute(imagePath: filePath, coordinate: resolvedCoordinate)
             lastSaved = saved
             errorMessage = nil
+            if resolvedCoordinate == nil {
+                hasLocationWarning = true
+            }
         } catch {
             errorMessage = String(describing: error)
         }
