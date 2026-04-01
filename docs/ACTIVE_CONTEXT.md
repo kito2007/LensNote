@@ -9,7 +9,8 @@ The project has:
 - XcodeBuildMCP repo setup for simulator-driven testing
 - MVVM explicitly documented as the required architectural pattern
 - an external design reference folder resolved at `/Users/parktaeyeong/SideProjects/LensNote/stitch_ai_camera_assistant`
-- camera save -> map data flow connected and persisted to disk (see "Completed Work" below)
+- camera save -> map data flow connected and persisted to disk
+- all feature branches merged and deleted — only `main` remains
 
 ## Current High-Level Goal
 
@@ -45,50 +46,63 @@ Camera save flow and map experience have been connected:
 Persistent file-backed repository added:
 
 15. `FilePhotoRepository` created at `LensNote/Domain/Repositories/FilePhotoRepository.swift`.
-    - Writes `[PhotoItem]` as JSON to `<Documents>/photo_items.json` using `JSONEncoder`/`JSONDecoder`.
-    - `save(_:)` reads the existing array, appends, and atomically writes back.
-    - `fetchAll()` returns `[]` gracefully when the file does not yet exist.
-    - `LocalPhotoRepository` preserved for preview/test use.
 16. `DIContainer` updated: `self.photoRepository = FilePhotoRepository()` replaces `LocalPhotoRepository()`.
 17. Build verified: `BUILD SUCCEEDED` on iPhone 17 Pro simulator (iOS 26.4).
 
+## Completed Work (2026-04-01)
+
+Camera onboarding flow QA and tab bar fix:
+
+18. Manual test session started — camera live view confirmed working on real device.
+19. **Bug found & fixed**: `FloatingDockBar`가 카메라 라이브 뷰 하단 UI(어시스턴트 패널 + 셔터 버튼)를 가리는 문제.
+    - `CameraView`에 `@Binding var isLiveCamera: Bool` 추가.
+    - `step`이 `.camera`로 변경될 때 `isLiveCamera = true` 업데이트.
+    - `RootView`에서 `isCameraLive`가 `true`이면 `FloatingDockBar` 렌더링 스킵.
+    - 수정 파일: `LensNote/Features/Camera/CameraView.swift`, `LensNote/Application/RootView.swift`.
+20. 브랜치 정리 완료:
+    - `feature/design-system-v2`, `feature/stitch-home-redesign` 로컬/원격 모두 삭제.
+    - 모든 작업 main에 머지 & 푸시 완료. 현재 `main` 브랜치만 존재.
+
 ## Known Architectural State
 
-Camera save flow and map data flow are connected and now persistent:
-
-- Camera save uses `SavePhotoUseCase` + `FilePhotoRepository` (JSON on disk).
-- Map reads LensNote pins via `FetchPhotoPinsUseCase` from the same repository instance, merged with PHPhotoLibrary pins.
-- Photos survive app restarts as long as the app's Documents directory is not cleared.
+- Camera save flow → `SavePhotoUseCase` + `FilePhotoRepository` (JSON on disk).
+- Map reads LensNote pins via `FetchPhotoPinsUseCase` from same repository, merged with PHPhotoLibrary pins.
+- Photos survive app restarts as long as Documents directory is not cleared.
+- `FloatingDockBar` is the custom tab navigation overlay in `RootView` — native TabView tab bar is not used.
 
 ## Pending / Residual Risks
 
-- `fetchAll()` is called synchronously on the main actor inside `loadLensNotePins()`. Fine for current dataset sizes; revisit if the JSON file grows large.
-- No migration logic: if `PhotoItem` schema changes (new required fields), the JSON decode will fail silently (returns `[]`). Add a version field before shipping to users who already have data.
-- `loadLensNotePins()` is called synchronously on the main actor. For large datasets this is fine with the current in-memory store, but requires a revisit if storage becomes async.
-- Location permission dialog timing: `LocationProvider.start()` is called when the camera session starts. If the user denies location, `latestCoordinate` stays nil and all saves trigger the warning toast — this is intentional and correct behavior.
-- `PinAnnotationView` source differentiation is functional but has not been reviewed for the full design spec polish (shadow intensity, animation timing). Recommend designer review.
+- `fetchAll()` is called synchronously on the main actor inside `loadLensNotePins()`. Fine for current dataset sizes; revisit if JSON file grows large.
+- No migration logic: if `PhotoItem` schema changes, JSON decode fails silently (returns `[]`). Add version field before shipping.
+- `PinAnnotationView` source differentiation has not been reviewed for full design spec polish (shadow intensity, animation timing).
 - No automated test target exists. Manual QA is the only verification path.
+- Runtime persistence validation (camera → save → force-quit → relaunch → map pin) still not formally confirmed.
 
 ## Next Recommended Tasks (in priority order)
 
-1. **Runtime validation** — manually confirm: camera → capture → save → force-quit → relaunch → map tab shows LensNote pin. (QA agent had simulator coordinate issues last session; needs manual run.)
-2. **Designer review** — ask `lensnote-designer` to review LensNote vs library pin visual differentiation in `PinAnnotationView`.
-3. **Camera onboarding flow** (backlog P0) — concept input → live guidance → capture end-to-end without friction. Assign: `lensnote-designer` → `lensnote-ios-engineer` → `lensnote-simulator-qa`.
-4. **Stabilize live guidance UX** (backlog P0) — guidance messaging should be calm and understandable.
-5. **Filter/concept visibility** (backlog P1) — expose concept recommendation clearly in camera flow.
+1. **디자인 전면 개선** (우선순위 상향) — 맵 화면부터 시작:
+   - Map 탭: 핀 상세 카드, 빈 상태, 권한 안내 화면 디자인
+   - Camera 라이브 뷰: 어시스턴트 패널 및 구도 오버레이 정리
+   - 전체 화면 시각 언어 통일 (dark cinematic, cyan accent)
+   - 담당: `lensnote-designer` → `lensnote-ios-engineer`
+2. **Runtime validation** — camera → capture → save → force-quit → relaunch → map pin 확인 (수동 QA).
+3. **카메라 온보딩 플로우 완성** (backlog P0) — 레퍼런스 사진 플로우, 분석 중 UX 등.
+4. **Live guidance UX 안정화** (backlog P0).
+5. **필터/컨셉 가시성** (backlog P1).
 
 ## Verification Status
 
-- Camera save -> map data flow architecture: implemented and build-verified
+- Camera save -> map data flow: implemented and build-verified
 - `NSLocationWhenInUseUsageDescription`: added to pbxproj
-- `PhotoPinSource` enum and `PhotoPin.source`: implemented
+- `PhotoPinSource` + `PhotoPin.source`: implemented
 - `FetchPhotoPinsUseCase`: implemented
 - `LocationProvider`: implemented
 - `hasLocationWarning` + location warning toast: implemented
-- Build: SUCCEEDED (iPhone 17 Pro simulator, iOS 26.4) — both sessions
 - `FilePhotoRepository`: implemented and build-verified
 - `DIContainer` wired to `FilePhotoRepository`: implemented and build-verified
-- Runtime persistence validation: not yet performed
+- FloatingDockBar hidden in camera live view: implemented, **real-device verified**
+- Runtime persistence validation: not yet formally confirmed
+- Branch state: main only, all work merged and pushed
 
 ## Update Rule
 
