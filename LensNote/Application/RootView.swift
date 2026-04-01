@@ -14,6 +14,7 @@ struct RootView: View {
     let container: DIContainer
     @StateObject private var mapVM: MapViewModel
     @State private var selectedTab: AppTab = .home
+    @State private var isCameraLive: Bool = false
 
     init(cameraVM: CameraViewModel, container: DIContainer) {
         self.cameraVM = cameraVM
@@ -32,7 +33,7 @@ struct RootView: View {
                 )
                 .tag(AppTab.home)
 
-                CameraView(viewModel: cameraVM)
+                CameraView(viewModel: cameraVM, isLiveCamera: $isCameraLive)
                     .tag(AppTab.camera)
 
                 MapView(viewModel: mapVM)
@@ -43,10 +44,12 @@ struct RootView: View {
             }
             .ignoresSafeArea(edges: .bottom)
 
-            // 플로팅 dock 오버레이
-            FloatingDockBar(selectedTab: $selectedTab)
-                .padding(.horizontal, LensNoteTheme.Spacing.lg)
-                .padding(.bottom, LensNoteTheme.Spacing.lg)
+            // 플로팅 dock 오버레이 — 카메라 라이브 뷰에서는 숨김
+            if !isCameraLive {
+                FloatingDockBar(selectedTab: $selectedTab)
+                    .padding(.horizontal, LensNoteTheme.Spacing.lg)
+                    .padding(.bottom, LensNoteTheme.Spacing.lg)
+            }
         }
         .ignoresSafeArea(edges: .bottom)
         .onAppear {

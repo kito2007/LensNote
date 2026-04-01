@@ -32,7 +32,9 @@ struct CameraDesign {
 /// 입력(레퍼런스/텍스트/수동) -> 촬영 -> 결과 저장의 플로우를 하나의 상태 머신(step)으로 관리한다.
 struct CameraView: View {
     @StateObject private var viewModel: CameraViewModel
-    
+    /// 라이브 카메라 단계일 때 true — RootView에서 FloatingDockBar 숨김에 사용.
+    @Binding var isLiveCamera: Bool
+
     @State private var step: CameraInputMode = .select
     @State private var conceptInput: String = ""
     @State private var referencePickerItem: PhotosPickerItem?
@@ -51,8 +53,9 @@ struct CameraView: View {
     
     private let assistService: CameraAssistServiceProtocol = CoreMLCameraAssistService()
     
-    init(viewModel: CameraViewModel) {
+    init(viewModel: CameraViewModel, isLiveCamera: Binding<Bool> = .constant(false)) {
         _viewModel = StateObject(wrappedValue: viewModel)
+        _isLiveCamera = isLiveCamera
     }
     
     var body: some View {
@@ -164,6 +167,9 @@ struct CameraView: View {
                 try? await Task.sleep(nanoseconds: 2_500_000_000)
                 viewModel.hasLocationWarning = false
             }
+        }
+        .onChange(of: step) { _, newStep in
+            isLiveCamera = (newStep == .camera)
         }
         .task(id: step) {
             // 카메라 단계에서만 AVCaptureSession을 실행하고, 나머지 단계에서는 중지한다.
