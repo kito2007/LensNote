@@ -17,6 +17,15 @@ import Combine
 import Photos
 import CoreLocation
 
+/// 사진 핀의 출처를 구분하는 열거형.
+/// LensNote 저장 경로와 PHPhotoLibrary 경로를 분리하여 UI에서 다르게 표현할 수 있게 한다.
+enum PhotoPinSource: Equatable {
+    /// SavePhotoUseCase를 통해 LensNote 내부 저장소에 저장된 사진
+    case lensNote
+    /// PHPhotoLibrary에서 읽어온 기기 사진 라이브러리 사진
+    case library
+}
+
 /// 한 장의 사진을 지도에 표시하기 위한 최소 정보(좌표/제목/썸네일 등)
 struct PhotoPin: Identifiable, Equatable {
     let id: UUID
@@ -26,6 +35,8 @@ struct PhotoPin: Identifiable, Equatable {
     let createdAt: Date
     let assetLocalIdentifier: String?
     let thumbnail: UIImage?
+    /// 이 핀이 어디서 왔는지 — LensNote 저장 경로 또는 PHPhotoLibrary
+    let source: PhotoPinSource
 
     /// MKMapKit에서 사용하는 좌표 타입으로 변환한 값
     var coordinate: CLLocationCoordinate2D {
@@ -93,6 +104,7 @@ final class MapViewModel: NSObject, ObservableObject, PHPhotoLibraryChangeObserv
     // - fetchResult/loadTask: 포토 라이브러리 페치와 비동기 배치 로딩
     // - geocodeCache/Queue: 지명 캐시와 큐(중복 방지용 키 포함)
     // - hasLoadedPhotos: 중복 로딩 방지 플래그
+    // - fetchPhotoPinsUseCase: LensNote 저장 경로 핀 로드용 유스케이스(옵셔널)
     private let geocoder = CLGeocoder()
     private var fetchResult: PHFetchResult<PHAsset>?
     private var loadTask: Task<Void, Never>?
@@ -106,12 +118,50 @@ final class MapViewModel: NSObject, ObservableObject, PHPhotoLibraryChangeObserv
     private var geocodeTask: Task<Void, Never>?
     private let geocodeCacheKey = "MapViewModel.GeocodeCache.v1"
     private var hasLoadedPhotos = false
+    private let fetchPhotoPinsUseCase: FetchPhotoPinsUseCase?
 
-    /// 시작 시 지명 캐시를 불러오고, 권한 없을 때를 대비한 목업 핀을 로드
+    /// 프리뷰/테스트용 기본 이니셜라이저 — FetchPhotoPinsUseCase 없이 동작한다.
     override init() {
+        self.fetchPhotoPinsUseCase = nil
         super.init()
         loadGeocodeCache()
         loadMockPins()
+    }
+
+    /// 프로덕션 이니셜라이저 — DI를 통해 FetchPhotoPinsUseCase를 주입한다.
+    init(fetchPhotoPinsUseCase: FetchPhotoPinsUseCase) {
+        self.fetchPhotoPinsUseCase = fetchPhotoPinsUseCase
+        super.init()
+        loadGeocodeCache()
+        loadMockPins()
+    }
+
+    /// LensNote 저장 경로로 저장된 사진을 핀으로 변환하여 pins 배열 앞쪽에 병합한다.
+    /// 좌표 없는 PhotoItem은 지도에 표시할 수 없으므로 스킵한다.
+    func loadLensNotePins() {
+        guard let useCase = fetchPhotoPinsUseCase else { return }
+        let items = (try? useCase.execute()) ?? []
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateStyle = .medium
+        dateFormatter.timeStyle = .none
+
+        let newPins: [PhotoPin] = items.compactMap { item in
+            guard let coord = item.coordinate else { return nil }
+            return PhotoPin(
+                id: item.id,
+                latitude: coord.latitude,
+                longitude: coord.longitude,
+                title: dateFormatter.string(from: item.createdAt),
+                createdAt: item.createdAt,
+                assetLocalIdentifier: nil,
+                thumbnail: nil,
+                source: .lensNote
+            )
+        }
+
+        // 기존 lensNote 핀을 교체하고 library 핀은 유지한다.
+        let libraryPins = pins.filter { $0.source == .library }
+        pins = newPins + libraryPins
     }
 
     /// 옵저버/태스크 정리
@@ -131,7 +181,8 @@ final class MapViewModel: NSObject, ObservableObject, PHPhotoLibraryChangeObserv
                 title: "Seoul City Hall",
                 createdAt: Date().addingTimeInterval(-3600),
                 assetLocalIdentifier: nil,
-                thumbnail: UIImage(systemName: "photo")
+                thumbnail: UIImage(systemName: "photo"),
+                source: .library
             ),
             PhotoPin(
                 id: UUID(),
@@ -140,7 +191,8 @@ final class MapViewModel: NSObject, ObservableObject, PHPhotoLibraryChangeObserv
                 title: "Gyeongbokgung",
                 createdAt: Date().addingTimeInterval(-7200),
                 assetLocalIdentifier: nil,
-                thumbnail: UIImage(systemName: "photo.fill")
+                thumbnail: UIImage(systemName: "photo.fill"),
+                source: .library
             ),
             PhotoPin(
                 id: UUID(),
@@ -149,7 +201,8 @@ final class MapViewModel: NSObject, ObservableObject, PHPhotoLibraryChangeObserv
                 title: "Namsan Tower",
                 createdAt: Date().addingTimeInterval(-14400),
                 assetLocalIdentifier: nil,
-                thumbnail: UIImage(systemName: "photo.on.rectangle")
+                thumbnail: UIImage(systemName: "photo.on.rectangle"),
+                source: .library
             )
         ]
     }
@@ -163,6 +216,7 @@ final class MapViewModel: NSObject, ObservableObject, PHPhotoLibraryChangeObserv
         guard hasPhotoUsageDescription() else {
             permissionState = .missingUsageDescription
             loadMockPins()
+            loadLensNotePins()
             isLoading = false
             return
         }
@@ -172,6 +226,7 @@ final class MapViewModel: NSObject, ObservableObject, PHPhotoLibraryChangeObserv
 
         guard status == .authorized || status == .limited else {
             loadMockPins()
+            loadLensNotePins()
             isLoading = false
             return
         }
@@ -185,6 +240,8 @@ final class MapViewModel: NSObject, ObservableObject, PHPhotoLibraryChangeObserv
         options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
         let result = PHAsset.fetchAssets(with: .image, options: options)
         await startLoading(from: result)
+        // PHPhotoLibrary 로드 후 LensNote 저장 경로 핀도 병합한다.
+        loadLensNotePins()
         hasLoadedPhotos = true
         isLoading = false
     }
@@ -272,7 +329,8 @@ final class MapViewModel: NSObject, ObservableObject, PHPhotoLibraryChangeObserv
                     title: title(for: asset, at: location, placeName: nil),
                     createdAt: asset.creationDate ?? Date(),
                     assetLocalIdentifier: asset.localIdentifier,
-                    thumbnail: nil
+                    thumbnail: nil,
+                    source: .library
                 )
             )
         }
@@ -358,7 +416,8 @@ final class MapViewModel: NSObject, ObservableObject, PHPhotoLibraryChangeObserv
                 title: newTitle,
                 createdAt: pin.createdAt,
                 assetLocalIdentifier: pin.assetLocalIdentifier,
-                thumbnail: pin.thumbnail
+                thumbnail: pin.thumbnail,
+                source: pin.source
             )
         }
     }
@@ -456,7 +515,7 @@ struct MapView: View {
                         switch item.kind {
                         case .single(let pin):
                             Annotation(pin.title, coordinate: pin.coordinate) {
-                                PinAnnotationView(selected: selection == pin.id)
+                                PinAnnotationView(selected: selection == pin.id, source: pin.source)
                                     .onTapGesture { selection = pin.id }
                             }
                             .tag(pin.id)
@@ -684,20 +743,87 @@ struct MapView: View {
     }
 }
 
-/// 지도 핀 아이콘 뷰(선택 시 하이라이트)
+/// 지도 핀 아이콘 뷰 — source에 따라 LensNote 핀과 라이브러리 핀을 다르게 표현한다.
 private struct PinAnnotationView: View {
     let selected: Bool
+    let source: PhotoPinSource
+
     var body: some View {
         ZStack {
+            switch source {
+            case .lensNote:
+                lensNotePin
+            case .library:
+                libraryPin
+            }
+        }
+        .accessibilityLabel(source == .lensNote ? "LensNote 촬영 사진" : "라이브러리 사진")
+    }
+
+    /// LensNote 고유 핀: 진한 primary 배경, camera.aperture 뱃지, 선택 시 cyan glow
+    private var lensNotePin: some View {
+        ZStack {
+            // 선택 시 cyan glow 링
             if selected {
-                Circle().fill(Color.accentColor.opacity(0.25))
-                    .frame(width: 44, height: 44)
+                Circle()
+                    .fill(LensNoteTheme.Colors.accentCyan.opacity(0.28))
+                    .frame(width: 64, height: 64)
                     .transition(.scale)
             }
-            Image(systemName: selected ? "mappin.circle.fill" : "mappin.circle")
-                .font(.title3)
-                .foregroundStyle(selected ? Color.accentColor : Color.primary)
+
+            // 메인 원형 배경
+            Circle()
+                .fill(LensNoteTheme.Colors.primary)
+                .frame(width: 48, height: 48)
+                .shadow(color: LensNoteTheme.Colors.primary.opacity(0.55), radius: selected ? 10 : 4, y: 2)
+
+            // accentCyan 포인터 dot
+            Circle()
+                .fill(LensNoteTheme.Colors.accentCyan)
+                .frame(width: 8, height: 8)
+                .offset(y: 20)
+
+            // camera.aperture 아이콘
+            Image(systemName: "camera.aperture")
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(.white)
+
+            // 좌상단 뱃지
+            Image(systemName: "camera.aperture")
+                .font(.system(size: 9, weight: .bold))
+                .foregroundStyle(.white)
+                .padding(3)
+                .background(LensNoteTheme.Colors.accentCyan)
+                .clipShape(Circle())
+                .offset(x: -14, y: -14)
         }
+        .frame(width: 64, height: 64)
+    }
+
+    /// 라이브러리 핀: surfaceHighest 배경, 조용한 스타일
+    private var libraryPin: some View {
+        ZStack {
+            if selected {
+                Circle().fill(Color.accentColor.opacity(0.22))
+                    .frame(width: 52, height: 52)
+                    .transition(.scale)
+            }
+
+            Circle()
+                .fill(LensNoteTheme.Colors.surfaceHighest)
+                .frame(width: 40, height: 40)
+                .overlay(
+                    Circle()
+                        .strokeBorder(.white.opacity(0.8), lineWidth: 0.8)
+                        .frame(width: 40, height: 40)
+                )
+                .shadow(radius: 3, y: 1)
+
+            Image(systemName: selected ? "mappin.circle.fill" : "mappin.circle")
+                .font(.system(size: 16))
+                .foregroundStyle(selected ? Color.accentColor : .white.opacity(0.82))
+        }
+        .frame(width: 52, height: 52)
     }
 }
 
