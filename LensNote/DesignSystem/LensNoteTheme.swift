@@ -51,6 +51,13 @@ enum LensNoteTheme {
             startPoint: .leading,
             endPoint: .trailing
         )
+
+        /// 지도 하단 그라데이션 오버레이 — FloatingDockBar 진입 전환용
+        static let mapOverlayBottom = LinearGradient(
+            colors: [Colors.surface.opacity(0), Colors.surface.opacity(0.55)],
+            startPoint: .top,
+            endPoint: .bottom
+        )
     }
 
     enum Typography {
