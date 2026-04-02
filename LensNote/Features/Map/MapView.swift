@@ -479,6 +479,7 @@ final class MapViewModel: NSObject, ObservableObject, PHPhotoLibraryChangeObserv
 
 struct MapView: View {
     @ObservedObject var viewModel: MapViewModel
+    var onCameraTabTap: (() -> Void)?
 
     // 지도 카메라/선택/현재 영역/클러스터 상태
     @State private var position: MapCameraPosition = .region(
@@ -539,7 +540,7 @@ struct MapView: View {
                         }
                     }
                 }
-                .mapStyle(.standard)
+                .mapStyle(.standard(pointsOfInterest: .excludingAll))
                 // 초기 로드: 약간의 지연 후 사진 로드 및 첫 클러스터 계산
                 .task {
                     try? await Task.sleep(nanoseconds: 200_000_000)
@@ -599,53 +600,73 @@ struct MapView: View {
                         selection = newValue
                     }
                 }
-                // 권한 배너/로딩 배너 표시
+                // 로딩 배너 표시
                 .safeAreaInset(edge: .top) {
-                    if viewModel.permissionState == .denied
-                        || viewModel.permissionState == .restricted
-                        || viewModel.permissionState == .missingUsageDescription {
-                        PermissionBannerView(
-                            state: viewModel.permissionState,
-                            onOpenSettings: viewModel.openAppSettings
-                        )
-                        .padding(.horizontal, 16)
-                        .padding(.top, 8)
-                        .transition(.move(edge: .top).combined(with: .opacity))
-                    } else if viewModel.isLoading {
+                    if viewModel.isLoading {
                         LoadingBannerView()
-                            .padding(.horizontal, 16)
-                            .padding(.top, 8)
+                            .padding(.horizontal, LensNoteTheme.Spacing.sm)
+                            .padding(.top, LensNoteTheme.Spacing.xxs)
                             .transition(.move(edge: .top).combined(with: .opacity))
                     }
                 }
 
-                // 보이는 핀이 있을 때만 패널 표시(컴팩트: 하단 시트, 레귤러: 우측 패널)
-                if !visiblePins.isEmpty {
+                // 하단 전환용 그라데이션 — FloatingDockBar와 맵 타일 경계 완화
+                VStack(spacing: 0) {
+                    Spacer()
+                    Rectangle()
+                        .fill(LensNoteTheme.Gradients.mapOverlayBottom)
+                        .frame(height: LensNoteTheme.Spacing.dockTotalClearance + 40)
+                }
+                .allowsHitTesting(false)
+
+                // 권한 거부 시 중앙 안내 오버레이
+                if viewModel.permissionState == .denied
+                    || viewModel.permissionState == .restricted
+                    || viewModel.permissionState == .missingUsageDescription {
+                    PermissionOverlayView(
+                        state: viewModel.permissionState,
+                        onOpenSettings: viewModel.openAppSettings
+                    )
+                    .transition(.opacity)
+                }
+
+                // 빈 상태 오버레이
+                if viewModel.pins.isEmpty
+                    && !viewModel.isLoading
+                    && viewModel.permissionState != .denied
+                    && viewModel.permissionState != .restricted
+                    && viewModel.permissionState != .missingUsageDescription {
+                    MapEmptyStateView(onCameraTabTap: onCameraTabTap)
+                        .transition(.opacity)
+                }
+
+                // 보이는 핀이 있고 카드가 열려있지 않을 때만 패널 표시
+                if !visiblePins.isEmpty && viewModel.selectedPin == nil {
                     if isCompact {
-                        // Bottom sheet style on compact width
                         VStack { Spacer() ; SidePanelList(pins: visiblePins, selection: $selection) }
                             .transition(.move(edge: .bottom).combined(with: .opacity))
-                            .padding(.bottom, 8)
+                            .padding(.bottom, LensNoteTheme.Spacing.dockTotalClearance)
                     } else {
-                        // Right side panel on regular width
                         HStack { Spacer() ; SidePanelList(pins: visiblePins, selection: $selection) }
                             .transition(.move(edge: .trailing).combined(with: .opacity))
                             .padding(.trailing, 8)
                     }
                 }
-            }
-        }
-        // 핀 선택 시 하단 카드 표시
-        .safeAreaInset(edge: .bottom) {
-            if let pin = viewModel.selectedPin {
-                PinCardView(pin: pin) {
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                        viewModel.closeCard()
+
+                // 핀 선택 시 하단 카드 표시
+                if let pin = viewModel.selectedPin {
+                    VStack {
+                        Spacer()
+                        PinCardView(pin: pin) {
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                                viewModel.closeCard()
+                            }
+                        }
+                        .padding(.horizontal, LensNoteTheme.Spacing.sm)
+                        .padding(.bottom, LensNoteTheme.Spacing.dockTotalClearance)
                     }
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
-                .transition(.move(edge: .bottom).combined(with: .opacity))
-                .padding(.horizontal, 16)
-                .padding(.bottom, LensNoteTheme.Spacing.dockTotalClearance)
             }
         }
     }
@@ -804,7 +825,7 @@ private struct PinAnnotationView: View {
     private var libraryPin: some View {
         ZStack {
             if selected {
-                Circle().fill(Color.accentColor.opacity(0.22))
+                Circle().fill(LensNoteTheme.Colors.primary.opacity(0.22))
                     .frame(width: 52, height: 52)
                     .transition(.scale)
             }
@@ -814,14 +835,14 @@ private struct PinAnnotationView: View {
                 .frame(width: 40, height: 40)
                 .overlay(
                     Circle()
-                        .strokeBorder(.white.opacity(0.8), lineWidth: 0.8)
+                        .strokeBorder(LensNoteTheme.Colors.textSecondary, lineWidth: 0.8)
                         .frame(width: 40, height: 40)
                 )
-                .shadow(radius: 3, y: 1)
+                .shadow(color: LensNoteTheme.Shadow.ambient, radius: 3, y: 1)
 
             Image(systemName: selected ? "mappin.circle.fill" : "mappin.circle")
                 .font(.system(size: 16))
-                .foregroundStyle(selected ? Color.accentColor : .white.opacity(0.82))
+                .foregroundStyle(selected ? LensNoteTheme.Colors.primary : LensNoteTheme.Colors.textSecondary)
         }
         .frame(width: 52, height: 52)
     }
@@ -832,11 +853,18 @@ private struct ClusterBadgeView: View {
     let count: Int
     var body: some View {
         ZStack {
-            Circle().fill(.ultraThinMaterial).frame(width: 40, height: 40)
-            Circle().strokeBorder(.secondary.opacity(0.4), lineWidth: 1).frame(width: 40, height: 40)
-            Text("\(count)").font(.subheadline).bold()
+            Circle()
+                .fill(LensNoteTheme.Colors.surfaceHighest)
+                .overlay(Circle().fill(.ultraThinMaterial))
+                .frame(width: 40, height: 40)
+            Circle()
+                .strokeBorder(LensNoteTheme.Colors.primary.opacity(0.5), lineWidth: 1)
+                .frame(width: 40, height: 40)
+            Text("\(count)")
+                .font(LensNoteTheme.Typography.microLabel)
+                .foregroundStyle(LensNoteTheme.Colors.accentCyan)
         }
-        .shadow(radius: 3, y: 2)
+        .shadow(color: LensNoteTheme.Shadow.ambient, radius: 3, y: 2)
     }
 }
 
@@ -847,17 +875,20 @@ private struct SidePanelList: View {
     private var displayedPins: [PhotoPin] { Array(pins.prefix(60)) }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: LensNoteTheme.Spacing.xxs) {
             HStack {
                 Text("이 지역의 사진")
-                    .font(.headline)
+                    .font(LensNoteTheme.Typography.microLabel)
+                    .foregroundStyle(LensNoteTheme.Colors.textTertiary)
+                    .textCase(.uppercase)
+                    .tracking(0.8)
                 Spacer()
                 Text("\(pins.count)")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .font(LensNoteTheme.Typography.microLabel)
+                    .foregroundStyle(LensNoteTheme.Colors.accentCyan)
             }
-            .padding(.horizontal, 12)
-            .padding(.top, 8)
+            .padding(.horizontal, LensNoteTheme.Spacing.xs)
+            .padding(.top, LensNoteTheme.Spacing.xxs)
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 10) {
@@ -867,58 +898,89 @@ private struct SidePanelList: View {
                                 selection = pin.id
                             }
                         } label: {
-                            HStack(spacing: 8) {
-                                Group {
-                                    PinThumbnailView(pin: pin, size: 48)
-                                }
-                                .frame(width: 48, height: 48)
-                                .background(Color(.systemGray5))
-                                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                            HStack(spacing: LensNoteTheme.Spacing.xxs) {
+                                PinThumbnailView(pin: pin, size: 48)
+                                    .frame(width: 48, height: 48)
+                                    .background(LensNoteTheme.Colors.surfaceHighest)
+                                    .clipShape(RoundedRectangle(cornerRadius: LensNoteTheme.Radius.card, style: .continuous))
 
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(pin.title)
-                                        .font(.subheadline)
+                                        .font(LensNoteTheme.Typography.body)
+                                        .foregroundStyle(LensNoteTheme.Colors.textPrimary)
                                         .lineLimit(1)
                                     Text(pin.createdAt.formatted(date: .abbreviated, time: .omitted))
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
+                                        .font(LensNoteTheme.Typography.technical)
+                                        .foregroundStyle(LensNoteTheme.Colors.textTertiary)
                                 }
                             }
                             .padding(10)
-                            .background(selection == pin.id ? .thinMaterial : .ultraThinMaterial)
-                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                            .shadow(radius: 4, y: 2)
+                            .background(
+                                selection == pin.id
+                                    ? LensNoteTheme.Colors.primary.opacity(0.15)
+                                    : LensNoteTheme.Colors.surfaceHigh
+                            )
+                            .clipShape(RoundedRectangle(cornerRadius: LensNoteTheme.Radius.card, style: .continuous))
+                            .shadow(color: LensNoteTheme.Shadow.ambient, radius: 4, y: 2)
                         }
                         .buttonStyle(.plain)
                     }
                 }
-                .padding(.horizontal, 12)
+                .padding(.horizontal, LensNoteTheme.Spacing.xs)
                 .padding(.bottom, 10)
             }
         }
         .frame(maxWidth: 380)
-        .background(.bar)
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .shadow(radius: 10, y: 6)
+        .background(
+            RoundedRectangle(cornerRadius: LensNoteTheme.Radius.card, style: .continuous)
+                .fill(LensNoteTheme.Colors.surfaceHigh)
+                .overlay(
+                    RoundedRectangle(cornerRadius: LensNoteTheme.Radius.card, style: .continuous)
+                        .fill(.ultraThinMaterial)
+                )
+        )
+        .clipShape(RoundedRectangle(cornerRadius: LensNoteTheme.Radius.card, style: .continuous))
+        .shadow(color: LensNoteTheme.Shadow.elevated, radius: 10, y: 6)
     }
 }
 
-/// 하단 상세 카드(썸네일/제목/시간)
+/// 하단 상세 카드(썸네일/제목/시간/소스)
 private struct PinCardView: View {
     let pin: PhotoPin
     let onClose: () -> Void
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: LensNoteTheme.Spacing.xs) {
             thumbnail
 
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: LensNoteTheme.Spacing.xxxs) {
+                // 소스 뱃지
+                Text(pin.source == .lensNote ? "LENSNOTE" : "LIBRARY")
+                    .font(LensNoteTheme.Typography.microLabel)
+                    .tracking(0.8)
+                    .foregroundStyle(
+                        pin.source == .lensNote
+                            ? LensNoteTheme.Colors.accentCyan
+                            : LensNoteTheme.Colors.textTertiary
+                    )
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(
+                        (pin.source == .lensNote
+                            ? LensNoteTheme.Colors.accentCyan
+                            : LensNoteTheme.Colors.textTertiary
+                        ).opacity(0.12)
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+
                 Text(pin.title)
-                    .font(.headline)
+                    .font(LensNoteTheme.Typography.bodyStrong)
+                    .foregroundStyle(LensNoteTheme.Colors.textPrimary)
+                    .lineLimit(1)
 
                 Text(pin.createdAt.formatted(date: .abbreviated, time: .shortened))
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .font(LensNoteTheme.Typography.technical)
+                    .foregroundStyle(LensNoteTheme.Colors.textTertiary)
             }
 
             Spacer()
@@ -926,56 +988,80 @@ private struct PinCardView: View {
             Button(action: onClose) {
                 Image(systemName: "xmark.circle.fill")
                     .font(.title3)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(LensNoteTheme.Colors.textTertiary)
             }
             .accessibilityLabel("닫기")
         }
-        .padding(14)
-        .background(.thinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .shadow(radius: 8, y: 4)
+        .padding(LensNoteTheme.Spacing.sm)
+        .background(
+            RoundedRectangle(cornerRadius: LensNoteTheme.Radius.cardLarge, style: .continuous)
+                .fill(LensNoteTheme.Colors.surfaceHigh)
+                .overlay(
+                    RoundedRectangle(cornerRadius: LensNoteTheme.Radius.cardLarge, style: .continuous)
+                        .fill(.ultraThinMaterial)
+                )
+        )
+        .clipShape(RoundedRectangle(cornerRadius: LensNoteTheme.Radius.cardLarge, style: .continuous))
+        .shadow(color: LensNoteTheme.Shadow.elevated, radius: 8, y: 4)
     }
 
     private var thumbnail: some View {
-        PinThumbnailView(pin: pin, size: 44)
-        .frame(width: 44, height: 44)
-        .background(Color(.systemGray5))
-        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        PinThumbnailView(pin: pin, size: 56)
+            .frame(width: 56, height: 56)
+            .background(LensNoteTheme.Colors.surfaceHighest)
+            .clipShape(RoundedRectangle(cornerRadius: LensNoteTheme.Radius.card, style: .continuous))
     }
 }
 
-/// 권한 안내 배너
-private struct PermissionBannerView: View {
+/// 권한 안내 오버레이 — 지도 위 중앙에 반투명 카드로 표시
+private struct PermissionOverlayView: View {
     let state: MapViewModel.PermissionState
     let onOpenSettings: () -> Void
 
     var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundStyle(.yellow)
+        VStack(spacing: LensNoteTheme.Spacing.md) {
+            Image(systemName: "photo.badge.exclamationmark")
+                .font(.system(size: 48, weight: .light))
+                .foregroundStyle(LensNoteTheme.Colors.warning)
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(spacing: LensNoteTheme.Spacing.xxs) {
                 Text(title)
-                    .font(.subheadline)
-                    .bold()
-                Text(message)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
+                    .font(LensNoteTheme.Typography.cardTitle)
+                    .foregroundStyle(LensNoteTheme.Colors.textPrimary)
+                    .multilineTextAlignment(.center)
 
-            Spacer()
+                Text(message)
+                    .font(LensNoteTheme.Typography.body)
+                    .foregroundStyle(LensNoteTheme.Colors.textSecondary)
+                    .multilineTextAlignment(.center)
+            }
 
             if state != .missingUsageDescription {
-                Button("설정") {
+                Button {
                     onOpenSettings()
+                } label: {
+                    Text("설정 열기")
+                        .font(LensNoteTheme.Typography.bodyStrong)
+                        .foregroundStyle(LensNoteTheme.Colors.accentCyan)
+                        .padding(.horizontal, LensNoteTheme.Spacing.lg)
+                        .padding(.vertical, LensNoteTheme.Spacing.xs)
+                        .background(LensNoteTheme.Colors.accentCyan.opacity(0.12))
+                        .clipShape(RoundedRectangle(cornerRadius: LensNoteTheme.Radius.button, style: .continuous))
                 }
-                .font(.subheadline)
             }
         }
-        .padding(12)
-        .background(.ultraThinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .shadow(radius: 6, y: 3)
+        .padding(LensNoteTheme.Spacing.xl)
+        .frame(maxWidth: 320)
+        .background(
+            RoundedRectangle(cornerRadius: LensNoteTheme.Radius.cardLarge, style: .continuous)
+                .fill(LensNoteTheme.Colors.surface.opacity(0.90))
+                .overlay(
+                    RoundedRectangle(cornerRadius: LensNoteTheme.Radius.cardLarge, style: .continuous)
+                        .fill(.ultraThinMaterial)
+                )
+        )
+        .clipShape(RoundedRectangle(cornerRadius: LensNoteTheme.Radius.cardLarge, style: .continuous))
+        .shadow(color: LensNoteTheme.Shadow.elevated, radius: 16, y: 8)
     }
 
     private var title: String {
@@ -994,7 +1080,7 @@ private struct PermissionBannerView: View {
     private var message: String {
         switch state {
         case .denied:
-            return "설정에서 사진 접근을 허용해주세요."
+            return "지도에 사진을 표시하려면\n설정에서 사진 접근을 허용해주세요."
         case .restricted:
             return "기기 제한으로 사진 접근이 불가합니다."
         case .missingUsageDescription:
@@ -1008,18 +1094,80 @@ private struct PermissionBannerView: View {
 /// 로딩 상태 배너
 private struct LoadingBannerView: View {
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: LensNoteTheme.Spacing.xxs) {
             ProgressView()
                 .controlSize(.small)
+                .tint(LensNoteTheme.Colors.accentCyan)
             Text("사진을 불러오는 중...")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .font(LensNoteTheme.Typography.body)
+                .foregroundStyle(LensNoteTheme.Colors.textSecondary)
             Spacer()
         }
-        .padding(12)
-        .background(.ultraThinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .shadow(radius: 6, y: 3)
+        .padding(LensNoteTheme.Spacing.xs)
+        .background(
+            RoundedRectangle(cornerRadius: LensNoteTheme.Radius.card, style: .continuous)
+                .fill(LensNoteTheme.Colors.surfaceHigh)
+                .overlay(
+                    RoundedRectangle(cornerRadius: LensNoteTheme.Radius.card, style: .continuous)
+                        .fill(.ultraThinMaterial)
+                )
+        )
+        .clipShape(RoundedRectangle(cornerRadius: LensNoteTheme.Radius.card, style: .continuous))
+        .shadow(color: LensNoteTheme.Shadow.ambient, radius: 6, y: 3)
+    }
+}
+
+/// 핀이 없을 때 표시되는 빈 상태 안내
+private struct MapEmptyStateView: View {
+    var onCameraTabTap: (() -> Void)?
+
+    var body: some View {
+        VStack(spacing: LensNoteTheme.Spacing.md) {
+            Image(systemName: "camera.aperture")
+                .font(.system(size: 56, weight: .ultraLight))
+                .foregroundStyle(LensNoteTheme.Colors.accentCyan)
+
+            VStack(spacing: LensNoteTheme.Spacing.xxs) {
+                Text("아직 저장된 사진이 없어요")
+                    .font(LensNoteTheme.Typography.cardTitle)
+                    .foregroundStyle(LensNoteTheme.Colors.textPrimary)
+                    .multilineTextAlignment(.center)
+
+                Text("카메라로 사진을 찍으면\n이 지도에 표시됩니다")
+                    .font(LensNoteTheme.Typography.body)
+                    .foregroundStyle(LensNoteTheme.Colors.textSecondary)
+                    .multilineTextAlignment(.center)
+            }
+
+            if let onCameraTabTap {
+                Button {
+                    onCameraTabTap()
+                } label: {
+                    HStack(spacing: LensNoteTheme.Spacing.xxs) {
+                        Image(systemName: "camera.fill")
+                        Text("카메라로 이동")
+                    }
+                    .font(LensNoteTheme.Typography.bodyStrong)
+                    .foregroundStyle(LensNoteTheme.Colors.accentCyan)
+                    .padding(.horizontal, LensNoteTheme.Spacing.lg)
+                    .padding(.vertical, LensNoteTheme.Spacing.xs)
+                    .background(LensNoteTheme.Colors.accentCyan.opacity(0.12))
+                    .clipShape(RoundedRectangle(cornerRadius: LensNoteTheme.Radius.button, style: .continuous))
+                }
+            }
+        }
+        .padding(LensNoteTheme.Spacing.xl)
+        .frame(maxWidth: 300)
+        .background(
+            RoundedRectangle(cornerRadius: LensNoteTheme.Radius.cardLarge, style: .continuous)
+                .fill(LensNoteTheme.Colors.surface.opacity(0.85))
+                .overlay(
+                    RoundedRectangle(cornerRadius: LensNoteTheme.Radius.cardLarge, style: .continuous)
+                        .fill(.ultraThinMaterial)
+                )
+        )
+        .clipShape(RoundedRectangle(cornerRadius: LensNoteTheme.Radius.cardLarge, style: .continuous))
+        .shadow(color: LensNoteTheme.Shadow.elevated, radius: 16, y: 8)
     }
 }
 
@@ -1044,7 +1192,7 @@ private struct PinThumbnailView: View {
                     .resizable()
                     .scaledToFit()
                     .padding(size * 0.2)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(LensNoteTheme.Colors.textTertiary)
             }
         }
         .task(id: pin.assetLocalIdentifier) {
