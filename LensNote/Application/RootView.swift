@@ -36,7 +36,11 @@ struct RootView: View {
                 CameraView(viewModel: cameraVM, isLiveCamera: $isCameraLive)
                     .tag(AppTab.camera)
 
-                MapView(viewModel: mapVM)
+                MapView(viewModel: mapVM, onCameraTabTap: {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                        selectedTab = .camera
+                    }
+                })
                     .tag(AppTab.map)
 
                 ProfileView()
