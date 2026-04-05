@@ -27,29 +27,39 @@ struct CameraLiveStepView: View {
 
     var body: some View {
         ZStack {
+            // MARK: - Camera feed
             CameraPreview(session: session)
                 .ignoresSafeArea()
 
+            // Glass overlay for depth — stitch ref: from-black/20 via-transparent to-black/40
+            LinearGradient(
+                colors: [
+                    Color.black.opacity(0.20),
+                    Color.clear,
+                    Color.black.opacity(0.40)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
+            .allowsHitTesting(false)
+
+            // MARK: - Camera status error
             if let cameraStatusMessage {
-                VStack(spacing: 8) {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundStyle(.yellow)
-                    Text(cameraStatusMessage)
-                        .font(.footnote)
-                        .multilineTextAlignment(.center)
-                        .foregroundStyle(.white)
-                }
-                .padding(14)
-                .background(Color.black.opacity(0.75))
-                .clipShape(RoundedRectangle(cornerRadius: CameraDesign.cardRadius, style: .continuous))
-                .padding(.horizontal, CameraDesign.screenPadding)
+                cameraStatusBanner(cameraStatusMessage)
             }
 
+            // MARK: - Composition guides
             if showGrid {
                 GridOverlayView()
                     .ignoresSafeArea()
                     .allowsHitTesting(false)
             }
+
+            // AI dynamic alignment circle — stitch ref: dashed border, primary color
+            AIDynamicAlignmentOverlay()
+                .ignoresSafeArea()
+                .allowsHitTesting(false)
 
             if let overlayState {
                 FramingGuideOverlay(state: overlayState)
@@ -59,106 +69,335 @@ struct CameraLiveStepView: View {
                     .padding(.vertical, 76)
             }
 
-            VStack(spacing: CameraDesign.itemSpacing) {
-                HStack {
-                    backButton(action: onBack)
-
-                    Spacer()
-
-                    Button(action: onToggleGrid) {
-                        Image(systemName: showGrid ? "grid" : "grid.circle")
-                            .font(.system(size: 16, weight: .semibold))
-                    }
-                    .buttonStyle(HeaderIconButtonStyle())
-                }
-                .padding(.horizontal, CameraDesign.screenPadding)
+            // MARK: - UI layers
+            VStack(spacing: 0) {
+                // Top bar — back + grid toggle
+                topBar
+                    .padding(.horizontal, LensNoteTheme.Spacing.sm)
+                    .padding(.top, LensNoteTheme.Spacing.xxs)
 
                 Spacer()
+            }
 
-                CameraAssistPanel(
-                    recommendation: recommendation,
-                    tips: tips
-                )
-                .padding(.horizontal, CameraDesign.screenPadding)
+            // MARK: - AI Analysis Chips (left-aligned, below top bar)
+            VStack(spacing: 0) {
+                aiAnalysisChips
+                    .padding(.top, 64)
+                    .padding(.leading, LensNoteTheme.Spacing.sm)
 
-                captureBar
-                    .padding(.horizontal, CameraDesign.screenPadding)
-                    .padding(.bottom, CameraDesign.screenPadding)
+                Spacer()
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            // MARK: - Side floating controls
+            sideControls
+
+            // MARK: - Bottom capture controls
+            VStack(spacing: 0) {
+                Spacer()
+                bottomCaptureBar
+                    .padding(.horizontal, LensNoteTheme.Spacing.xl)
+                    .padding(.bottom, LensNoteTheme.Spacing.md)
             }
         }
     }
 
-    private var captureBar: some View {
-        HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(conceptText.isEmpty ? "Standard Mode" : conceptText)
-                    .font(.headline)
-                    .foregroundStyle(.white)
-                if let profileName = overlayState?.profileName {
-                    Text(profileName)
-                        .font(.caption)
-                        .foregroundStyle(.white.opacity(0.72))
-                }
-                Text("구도: \(guidanceMessage)")
-                    .font(.footnote)
-                    .foregroundStyle(.white.opacity(0.84))
-                    .lineLimit(2)
-                Text(readyToCapture ? "촬영 준비 완료 · score \(Int(guidanceScore * 100))" : "구도 조정 중 · score \(Int(guidanceScore * 100))")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(readyToCapture ? .green : .yellow)
-                if let metrics = overlayState?.metrics {
-                    Text(debugSummary(metrics))
-                        .font(.caption2.monospacedDigit())
-                        .foregroundStyle(.white.opacity(0.65))
-                        .lineLimit(2)
-                }
+    // MARK: - Top Bar
+
+    private var topBar: some View {
+        HStack {
+            Button(action: onBack) {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(LensNoteTheme.Colors.textPrimary)
+                    .frame(width: 40, height: 40)
+                    .background(LensNoteTheme.Colors.sideControlBg)
+                    .background(.ultraThinMaterial)
+                    .clipShape(Circle())
             }
+            .buttonStyle(.plain)
+            .accessibilityLabel("뒤로")
 
             Spacer()
+
+            Button(action: onToggleGrid) {
+                Image(systemName: showGrid ? "grid" : "grid.circle")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(LensNoteTheme.Colors.textPrimary)
+                    .frame(width: 40, height: 40)
+                    .background(LensNoteTheme.Colors.sideControlBg)
+                    .background(.ultraThinMaterial)
+                    .clipShape(Circle())
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    // MARK: - AI Analysis Chips
+
+    private var aiAnalysisChips: some View {
+        VStack(alignment: .leading, spacing: LensNoteTheme.Spacing.xs) {
+            // Chip 1: Filter/Concept — tertiary icon
+            analysisChip(
+                icon: "paintpalette.fill",
+                iconColor: LensNoteTheme.Colors.tertiary,
+                label: "FILTER",
+                value: conceptText.isEmpty ? "STANDARD" : conceptText.uppercased()
+            )
+
+            // Chip 2: Camera settings — primary icon
+            analysisChip(
+                icon: "camera.aperture",
+                iconColor: LensNoteTheme.Colors.primary,
+                label: "ISO",
+                value: recommendation.iso.uppercased()
+            )
+
+            // Chip 3: Guidance status — accentCyan icon
+            analysisChip(
+                icon: "scope",
+                iconColor: LensNoteTheme.Colors.accentCyan,
+                label: "SCORE",
+                value: "\(Int(guidanceScore * 100))%"
+            )
+        }
+    }
+
+    private func analysisChip(
+        icon: String,
+        iconColor: Color,
+        label: String,
+        value: String
+    ) -> some View {
+        HStack(spacing: LensNoteTheme.Spacing.xxs) {
+            Image(systemName: icon)
+                .font(.system(size: 16))
+                .foregroundStyle(iconColor)
+
+            Text("\(label): \(value)")
+                .font(LensNoteTheme.Typography.chipLabel)
+                .textCase(.uppercase)
+                .tracking(1.2)
+                .foregroundStyle(LensNoteTheme.Colors.textPrimary)
+        }
+        .padding(.horizontal, LensNoteTheme.Spacing.sm)
+        .padding(.vertical, LensNoteTheme.Spacing.xxs)
+        .background(LensNoteTheme.Colors.surface.opacity(0.40))
+        .background(.ultraThinMaterial.opacity(0.6))
+        .clipShape(Capsule())
+        .overlay(
+            Capsule()
+                .stroke(LensNoteTheme.Colors.chipBorder, lineWidth: 1)
+        )
+    }
+
+    // MARK: - Side Floating Controls
+
+    private var sideControls: some View {
+        HStack {
+            // Left: Map shortcut
+            VStack {
+                Spacer()
+                sideButton(icon: "map")
+                    .padding(.bottom, 120)
+            }
+            .padding(.leading, LensNoteTheme.Spacing.xxs)
+
+            Spacer()
+
+            // Right: Photo library shortcut
+            VStack {
+                Spacer()
+                sideButton(icon: "photo.on.rectangle")
+                    .padding(.bottom, 120)
+            }
+            .padding(.trailing, LensNoteTheme.Spacing.xxs)
+        }
+    }
+
+    private func sideButton(icon: String) -> some View {
+        Button(action: {}) {
+            Image(systemName: icon)
+                .font(.system(size: 20))
+                .foregroundStyle(LensNoteTheme.Colors.textPrimary)
+                .frame(width: 56, height: 56)
+                .background(LensNoteTheme.Colors.sideControlBg)
+                .background(.ultraThinMaterial)
+                .clipShape(Circle())
+                .shadow(color: LensNoteTheme.Shadow.elevated, radius: 12, y: 4)
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - Bottom Capture Bar
+
+    private var bottomCaptureBar: some View {
+        HStack(alignment: .center) {
+            // Left: Reference thumbnail
+            referenceThumb
+
+            Spacer()
+
+            // Center: Shutter button
+            shutterButton
+
+            Spacer()
+
+            // Right: AI magic button
+            aiMagicButton
+        }
+    }
+
+    private var referenceThumb: some View {
+        ZStack(alignment: .topTrailing) {
+            Circle()
+                .stroke(LensNoteTheme.Colors.primary, lineWidth: 2)
+                .frame(width: 64, height: 64)
+                .overlay(
+                    Image(systemName: "photo.fill")
+                        .font(.system(size: 22))
+                        .foregroundStyle(LensNoteTheme.Colors.textSecondary)
+                )
+
+            Text("REF")
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(LensNoteTheme.Colors.textPrimary)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(LensNoteTheme.Colors.primary)
+                .clipShape(Capsule())
+                .offset(x: 4, y: -4)
+        }
+    }
+
+    private var shutterButton: some View {
+        ZStack {
+            // Glow behind
+            Circle()
+                .fill(LensNoteTheme.Colors.shutterGlow)
+                .frame(width: 96, height: 96)
+                .blur(radius: 24)
 
             Button(action: onCapture) {
                 ZStack {
                     Circle()
+                        .strokeBorder(Color.white, lineWidth: 4)
+                        .frame(width: 80, height: 80)
+                    Circle()
                         .fill(Color.white)
                         .frame(width: 68, height: 68)
-                    Circle()
-                        .stroke(Color.black.opacity(0.2), lineWidth: 2)
-                        .frame(width: 60, height: 60)
                 }
             }
+            .buttonStyle(ShutterButtonStyle())
             .disabled(isCapturingPhoto)
             .opacity(isCapturingPhoto ? 0.6 : 1)
             .accessibilityLabel("촬영")
         }
-        .padding(12)
-        .background(Color.black.opacity(0.55))
-        .clipShape(RoundedRectangle(cornerRadius: CameraDesign.cardRadius, style: .continuous))
     }
 
-    private func debugSummary(_ metrics: GuidanceDebugMetrics) -> String {
-        String(
-            format: "x %.2f  y %.2f  size %.2f  roll %.2f  stab %.2f",
-            metrics.xError,
-            metrics.yError,
-            metrics.sizeError,
-            metrics.rollError,
-            metrics.stabilityError
-        )
+    private var aiMagicButton: some View {
+        Button(action: {}) {
+            Image(systemName: "sparkles")
+                .font(.system(size: 24, weight: .semibold))
+                .foregroundStyle(LensNoteTheme.Colors.textPrimary)
+                .frame(width: 64, height: 64)
+                .background(LensNoteTheme.Gradients.hero)
+                .clipShape(Circle())
+                .shadow(color: LensNoteTheme.Shadow.elevated, radius: 12, y: 4)
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - Camera Status Banner
+
+    private func cameraStatusBanner(_ message: String) -> some View {
+        VStack(spacing: 8) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(LensNoteTheme.Colors.warning)
+            Text(message)
+                .font(LensNoteTheme.Typography.body)
+                .multilineTextAlignment(.center)
+                .foregroundStyle(LensNoteTheme.Colors.textPrimary)
+        }
+        .padding(14)
+        .background(LensNoteTheme.Colors.surface.opacity(0.75))
+        .background(.ultraThinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: LensNoteTheme.Radius.card, style: .continuous))
+        .padding(.horizontal, LensNoteTheme.Spacing.sm)
     }
 }
 
-private func backButton(action: @escaping () -> Void) -> some View {
-    Button(action: action) {
-        Image(systemName: "chevron.left")
-            .font(.system(size: 15, weight: .semibold))
-            .frame(width: 36, height: 36)
-            .background(Color.white.opacity(0.12))
-            .clipShape(Circle())
+// MARK: - Shutter Button Style
+
+private struct ShutterButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.90 : 1)
+            .animation(.easeOut(duration: 0.15), value: configuration.isPressed)
     }
-    .buttonStyle(.plain)
-    .foregroundStyle(.white)
-    .accessibilityLabel("뒤로")
 }
+
+// MARK: - AI Dynamic Alignment Overlay
+
+private struct AIDynamicAlignmentOverlay: View {
+    var body: some View {
+        GeometryReader { proxy in
+            let center = CGPoint(x: proxy.size.width / 2, y: proxy.size.height / 2)
+            let radius: CGFloat = 96
+
+            ZStack {
+                // Dashed circle — stitch ref: composition-guide, 1.5px dashed, primary/40
+                Circle()
+                    .strokeBorder(
+                        LensNoteTheme.Colors.primary.opacity(0.40),
+                        style: StrokeStyle(lineWidth: 1.5, dash: [8, 6])
+                    )
+                    .frame(width: radius * 2, height: radius * 2)
+                    .position(center)
+
+                // Center dot
+                Circle()
+                    .fill(LensNoteTheme.Colors.primary)
+                    .frame(width: 4, height: 4)
+                    .position(center)
+
+                // Horizontal alignment line — stitch ref: tertiary/30
+                Rectangle()
+                    .fill(LensNoteTheme.Colors.tertiary.opacity(0.30))
+                    .frame(width: proxy.size.width, height: 1)
+                    .position(x: proxy.size.width / 2, y: proxy.size.height * 0.45)
+            }
+        }
+    }
+}
+
+// MARK: - Grid Overlay
+
+private struct GridOverlayView: View {
+    var body: some View {
+        GeometryReader { geometry in
+            let w = geometry.size.width
+            let h = geometry.size.height
+
+            Path { path in
+                let w1 = w / 3, w2 = w1 * 2
+                let h1 = h / 3, h2 = h1 * 2
+
+                path.move(to: CGPoint(x: w1, y: 0))
+                path.addLine(to: CGPoint(x: w1, y: h))
+                path.move(to: CGPoint(x: w2, y: 0))
+                path.addLine(to: CGPoint(x: w2, y: h))
+                path.move(to: CGPoint(x: 0, y: h1))
+                path.addLine(to: CGPoint(x: w, y: h1))
+                path.move(to: CGPoint(x: 0, y: h2))
+                path.addLine(to: CGPoint(x: w, y: h2))
+            }
+            .stroke(Color.white.opacity(0.10), lineWidth: 0.8)
+        }
+    }
+}
+
+// MARK: - Framing Guide Overlay
 
 private struct FramingGuideOverlay: View {
     let state: GuidanceOverlayState
@@ -170,13 +409,16 @@ private struct FramingGuideOverlay: View {
 
             ZStack(alignment: .topLeading) {
                 RoundedRectangle(cornerRadius: 28, style: .continuous)
-                    .strokeBorder(state.readyToCapture ? Color.green : Color.white.opacity(0.92), style: StrokeStyle(lineWidth: 2.5, dash: state.readyToCapture ? [] : [12, 8]))
+                    .strokeBorder(
+                        state.readyToCapture ? LensNoteTheme.Colors.success : Color.white.opacity(0.92),
+                        style: StrokeStyle(lineWidth: 2.5, dash: state.readyToCapture ? [] : [12, 8])
+                    )
                     .frame(width: targetRect.width, height: targetRect.height)
                     .position(x: targetRect.midX, y: targetRect.midY)
 
                 if let detectedRect {
                     RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .strokeBorder(Color.cyan.opacity(0.95), style: StrokeStyle(lineWidth: 2))
+                        .strokeBorder(LensNoteTheme.Colors.accentCyan.opacity(0.95), style: StrokeStyle(lineWidth: 2))
                         .frame(width: detectedRect.width, height: detectedRect.height)
                         .position(x: detectedRect.midX, y: detectedRect.midY)
                 }
@@ -192,87 +434,48 @@ private struct FramingGuideOverlay: View {
                 if !state.readyToCapture, let symbol = correctionSymbol {
                     Image(systemName: symbol)
                         .font(.system(size: 26, weight: .bold))
-                        .foregroundStyle(Color.yellow)
+                        .foregroundStyle(LensNoteTheme.Colors.warning)
                         .position(arrowPosition(for: targetRect))
                 }
-
-                metricsPanel
-                    .position(x: proxy.size.width - 96, y: 48)
             }
         }
     }
 
     private var guideBadge: some View {
         Text(state.profileName)
-            .font(.caption.weight(.semibold))
-            .foregroundStyle(.white)
+            .font(LensNoteTheme.Typography.microLabel)
+            .foregroundStyle(LensNoteTheme.Colors.textPrimary)
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
-            .background(Color.black.opacity(0.48))
+            .background(LensNoteTheme.Colors.surface.opacity(0.48))
+            .background(.ultraThinMaterial.opacity(0.5))
             .clipShape(Capsule())
     }
 
     private var detectedBadge: some View {
         Text("Live")
             .font(.caption2.weight(.bold))
-            .foregroundStyle(Color.cyan)
+            .foregroundStyle(LensNoteTheme.Colors.accentCyan)
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
-            .background(Color.black.opacity(0.55))
+            .background(LensNoteTheme.Colors.surface.opacity(0.55))
             .clipShape(Capsule())
-    }
-
-    private var metricsPanel: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            metricRow("score", state.metrics.score)
-            metricRow("x", state.metrics.xError)
-            metricRow("y", state.metrics.yError)
-            metricRow("size", state.metrics.sizeError)
-            metricRow("roll", state.metrics.rollError)
-            metricRow("stab", state.metrics.stabilityError)
-        }
-        .font(.caption2.monospacedDigit())
-        .foregroundStyle(.white.opacity(0.86))
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
-        .background(Color.black.opacity(0.42))
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-    }
-
-    private func metricRow(_ label: String, _ value: Double) -> some View {
-        HStack(spacing: 6) {
-            Text(label)
-                .foregroundStyle(.white.opacity(0.55))
-            Text(String(format: "%.2f", value))
-        }
     }
 
     private var correctionSymbol: String? {
         switch state.correction {
-        case .moveLeft:
-            return "arrow.left.circle.fill"
-        case .moveRight:
-            return "arrow.right.circle.fill"
-        case .moveUp, .adjustHeadroom:
-            return "arrow.up.circle.fill"
-        case .moveDown:
-            return "arrow.down.circle.fill"
-        case .moveCloser:
-            return "plus.magnifyingglass"
-        case .moveFarther:
-            return "minus.magnifyingglass"
-        case .levelHorizon:
-            return "arrow.left.and.right.righttriangle.left.righttriangle.right.fill"
-        case .holdSteady:
-            return "hand.raised.fill"
-        case .brightenScene:
-            return "sun.max.fill"
-        case .reduceHighlights:
-            return "sun.min.fill"
-        case .findSubject:
-            return "viewfinder"
-        case .none:
-            return nil
+        case .moveLeft: return "arrow.left.circle.fill"
+        case .moveRight: return "arrow.right.circle.fill"
+        case .moveUp, .adjustHeadroom: return "arrow.up.circle.fill"
+        case .moveDown: return "arrow.down.circle.fill"
+        case .moveCloser: return "plus.magnifyingglass"
+        case .moveFarther: return "minus.magnifyingglass"
+        case .levelHorizon: return "arrow.left.and.right.righttriangle.left.righttriangle.right.fill"
+        case .holdSteady: return "hand.raised.fill"
+        case .brightenScene: return "sun.max.fill"
+        case .reduceHighlights: return "sun.min.fill"
+        case .findSubject: return "viewfinder"
+        case .none: return nil
         }
     }
 
@@ -287,98 +490,18 @@ private struct FramingGuideOverlay: View {
 
     private func arrowPosition(for rect: CGRect) -> CGPoint {
         switch state.correction {
-        case .moveLeft:
-            return CGPoint(x: rect.minX - 18, y: rect.midY)
-        case .moveRight:
-            return CGPoint(x: rect.maxX + 18, y: rect.midY)
-        case .moveUp, .adjustHeadroom:
-            return CGPoint(x: rect.midX, y: rect.minY - 18)
-        case .moveDown:
-            return CGPoint(x: rect.midX, y: rect.maxY + 18)
-        case .moveCloser, .moveFarther, .levelHorizon, .holdSteady, .brightenScene, .reduceHighlights, .findSubject, .none:
+        case .moveLeft: return CGPoint(x: rect.minX - 18, y: rect.midY)
+        case .moveRight: return CGPoint(x: rect.maxX + 18, y: rect.midY)
+        case .moveUp, .adjustHeadroom: return CGPoint(x: rect.midX, y: rect.minY - 18)
+        case .moveDown: return CGPoint(x: rect.midX, y: rect.maxY + 18)
+        case .moveCloser, .moveFarther, .levelHorizon, .holdSteady,
+             .brightenScene, .reduceHighlights, .findSubject, .none:
             return CGPoint(x: rect.midX, y: rect.midY)
         }
     }
 }
 
-private struct GridOverlayView: View {
-    var body: some View {
-        GeometryReader { geometry in
-            Path { path in
-                let width = geometry.size.width
-                let height = geometry.size.height
-
-                let w1 = width / 3
-                let w2 = w1 * 2
-                let h1 = height / 3
-                let h2 = h1 * 2
-
-                path.move(to: CGPoint(x: w1, y: 0))
-                path.addLine(to: CGPoint(x: w1, y: height))
-                path.move(to: CGPoint(x: w2, y: 0))
-                path.addLine(to: CGPoint(x: w2, y: height))
-                path.move(to: CGPoint(x: 0, y: h1))
-                path.addLine(to: CGPoint(x: width, y: h1))
-                path.move(to: CGPoint(x: 0, y: h2))
-                path.addLine(to: CGPoint(x: width, y: h2))
-            }
-            .stroke(Color.white.opacity(0.2), lineWidth: 0.8)
-        }
-    }
-}
-
-private struct CameraAssistPanel: View {
-    let recommendation: CameraRecommendation
-    let tips: [String]
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(recommendation.title)
-                .font(.headline)
-                .foregroundStyle(.white)
-
-            HStack(spacing: 8) {
-                AssistCell(title: "ISO", value: recommendation.iso)
-                AssistCell(title: "셔터", value: recommendation.shutterSpeed)
-            }
-            HStack(spacing: 8) {
-                AssistCell(title: "조리개", value: recommendation.aperture)
-                AssistCell(title: "WB", value: recommendation.whiteBalance)
-            }
-
-            if let first = tips.first {
-                Text("📐 \(first)")
-                    .font(.subheadline)
-                    .foregroundStyle(.white.opacity(0.9))
-            }
-        }
-        .padding(12)
-        .background(Color.black.opacity(0.58))
-        .clipShape(RoundedRectangle(cornerRadius: CameraDesign.cardRadius, style: .continuous))
-        .shadow(color: Color.black.opacity(0.28), radius: 20, x: 0, y: 10)
-    }
-}
-
-private struct AssistCell: View {
-    let title: String
-    let value: String
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(title)
-                .font(.caption)
-                .foregroundStyle(.white.opacity(0.72))
-            Text(value)
-                .font(.footnote)
-                .foregroundStyle(.white)
-                .lineLimit(1)
-        }
-        .padding(8)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.white.opacity(0.08))
-        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-    }
-}
+// MARK: - Camera Preview
 
 private struct CameraPreview: UIViewRepresentable {
     let session: AVCaptureSession
@@ -398,9 +521,7 @@ private struct CameraPreview: UIViewRepresentable {
     }
 
     final class PreviewView: UIView {
-        override class var layerClass: AnyClass {
-            AVCaptureVideoPreviewLayer.self
-        }
+        override class var layerClass: AnyClass { AVCaptureVideoPreviewLayer.self }
 
         var previewLayer: AVCaptureVideoPreviewLayer {
             guard let layer = self.layer as? AVCaptureVideoPreviewLayer else {
@@ -410,6 +531,8 @@ private struct CameraPreview: UIViewRepresentable {
         }
     }
 }
+
+// MARK: - Previews
 
 private struct CameraLiveStepPreviewWrapper: View {
     @State private var showGrid: Bool

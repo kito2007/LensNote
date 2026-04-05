@@ -13,78 +13,68 @@ struct CameraReferenceStepView: View {
     let selectedReferenceImage: UIImage?
     let isAnalyzing: Bool
     let onBack: () -> Void
-    
+
     var body: some View {
-        VStack(alignment: .leading, spacing: CameraDesign.sectionSpacing) {
+        VStack(alignment: .leading, spacing: LensNoteTheme.Spacing.sm) {
             HStack {
-                backButton(action: onBack)
+                CameraBackButton(action: onBack)
                 Spacer()
             }
-            
+
             Text("레퍼런스 사진")
-                .font(.system(size: 22, weight: .semibold))
-                .foregroundStyle(.white)
-            
+                .font(LensNoteTheme.Typography.sectionTitle)
+                .foregroundStyle(LensNoteTheme.Colors.textPrimary)
+
             Text("참고 사진을 업로드하면 임시 분석값으로 카메라 모드를 시작합니다.")
                 .font(.system(size: 17))
-                .foregroundStyle(.white.opacity(0.82))
-            
+                .foregroundStyle(LensNoteTheme.Colors.textSecondary)
+
             PhotosPicker(selection: $referencePickerItem, matching: .images, photoLibrary: .shared()) {
                 Label("사진 선택", systemImage: "photo")
-                    .font(.headline)
+                    .font(LensNoteTheme.Typography.bodyStrong)
+                    .foregroundStyle(LensNoteTheme.Colors.textPrimary)
                     .frame(maxWidth: .infinity, minHeight: 54)
-                    .background(Color.white.opacity(0.14))
-                    .clipShape(RoundedRectangle(cornerRadius: CameraDesign.buttonRadius, style: .continuous))
+                    .background(LensNoteTheme.Colors.cardOverlayStrong)
+                    .clipShape(RoundedRectangle(cornerRadius: LensNoteTheme.Radius.button, style: .continuous))
             }
             .buttonStyle(.plain)
-            
+
             if let selectedReferenceImage {
                 Image(uiImage: selectedReferenceImage)
                     .resizable()
                     .scaledToFill()
                     .frame(height: 180)
-                    .clipShape(RoundedRectangle(cornerRadius: CameraDesign.cardRadius, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: LensNoteTheme.Radius.card, style: .continuous))
             }
-            
+
             if isAnalyzing {
-                HStack(spacing: 8) {
+                HStack(spacing: LensNoteTheme.Spacing.xxs) {
                     ProgressView()
+                        .tint(LensNoteTheme.Colors.accentCyan)
                     Text("분석 중...")
-                        .font(.headline)
+                        .font(LensNoteTheme.Typography.bodyStrong)
+                        .foregroundStyle(LensNoteTheme.Colors.textPrimary)
                 }
-                .padding(12)
-                .background(Color.white.opacity(0.12))
-                .clipShape(RoundedRectangle(cornerRadius: CameraDesign.cardRadius, style: .continuous))
+                .padding(LensNoteTheme.Spacing.xs)
+                .background(LensNoteTheme.Colors.cardOverlay)
+                .clipShape(RoundedRectangle(cornerRadius: LensNoteTheme.Radius.card, style: .continuous))
             }
-            
+
             Spacer()
         }
-        .padding(CameraDesign.screenPadding)
-        .foregroundStyle(.white)
+        .padding(LensNoteTheme.Spacing.sm)
+        .foregroundStyle(LensNoteTheme.Colors.textPrimary)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.black)
+        .background(LensNoteTheme.Colors.surface)
     }
-}
-
-private func backButton(action: @escaping () -> Void) -> some View {
-    Button(action: action) {
-        Image(systemName: "chevron.left")
-            .font(.system(size: 15, weight: .semibold))
-            .frame(width: 36, height: 36)
-            .background(Color.white.opacity(0.12))
-            .clipShape(Circle())
-    }
-    .buttonStyle(.plain)
-    .foregroundStyle(.white)
-    .accessibilityLabel("뒤로")
 }
 
 private struct CameraReferenceStepPreviewWrapper: View {
     @State var referencePickerItem: PhotosPickerItem? = nil
-    
+
     let selectedReferenceImage: UIImage?
     var isAnalyzing: Bool
-    
+
     var body: some View {
         CameraReferenceStepView(
             referencePickerItem: $referencePickerItem,

@@ -17,23 +17,23 @@ struct CameraConceptStepView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: LensNoteTheme.Spacing.sm) {
             HStack {
-                backButton(action: onBack)
+                CameraBackButton(action: onBack)
                 Spacer()
             }
 
             Text("컨셉 입력")
-                .font(.system(size: 22, weight: .semibold))
-                .foregroundStyle(.white)
+                .font(LensNoteTheme.Typography.sectionTitle)
+                .foregroundStyle(LensNoteTheme.Colors.textPrimary)
 
             TextField("예: 야경, 인물, 풍경", text: $conceptInput)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
-                .padding(14)
-                .background(Color.white.opacity(0.12))
-                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                .foregroundStyle(.white)
+                .padding(LensNoteTheme.Spacing.sm)
+                .background(LensNoteTheme.Colors.cardOverlay)
+                .clipShape(RoundedRectangle(cornerRadius: LensNoteTheme.Radius.card, style: .continuous))
+                .foregroundStyle(LensNoteTheme.Colors.textPrimary)
 
             Button("카메라 시작", action: onStartCamera)
                 .buttonStyle(PrimaryCameraButtonStyle())
@@ -42,22 +42,9 @@ struct CameraConceptStepView: View {
 
             Spacer()
         }
-        .padding(16)
+        .padding(LensNoteTheme.Spacing.sm)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.black)
-    }
-
-    private func backButton(action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: "chevron.left")
-                .font(.system(size: 15, weight: .semibold))
-                .frame(width: 36, height: 36)
-                .background(Color.white.opacity(0.12))
-                .clipShape(Circle())
-        }
-        .buttonStyle(.plain)
-        .foregroundStyle(.white)
-        .accessibilityLabel("뒤로")
+        .background(LensNoteTheme.Colors.surface)
     }
 }
 

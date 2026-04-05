@@ -30,6 +30,14 @@ enum LensNoteTheme {
         static let glassOverlay = surface.opacity(0.70)
         static let cardOverlay = Color.white.opacity(0.08)
         static let cardOverlayStrong = Color.white.opacity(0.14)
+
+        // Camera-specific — stitch AI camera assistant reference
+        /// AI 분석 칩 테두리 (border-white/10)
+        static let chipBorder = Color.white.opacity(0.10)
+        /// 사이드 플로팅 버튼 배경 (surface-container-high/80)
+        static let sideControlBg = surfaceHigh.opacity(0.80)
+        /// 셔터 글로우 (primary/20)
+        static let shutterGlow = primary.opacity(0.20)
     }
 
     enum Gradients {
@@ -69,6 +77,8 @@ enum LensNoteTheme {
         static let bodyStrong = Font.system(size: 14, weight: .semibold)
         static let microLabel = Font.system(size: 11, weight: .semibold)
         static let technical = Font.system(size: 11, weight: .medium, design: .monospaced)
+        /// AI 분석 칩 텍스트 — 11px bold uppercase tracking-widest (stitch ref)
+        static let chipLabel = Font.system(size: 11, weight: .bold)
     }
 
     enum Radius {

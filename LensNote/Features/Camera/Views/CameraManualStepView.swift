@@ -7,7 +7,7 @@
 
 import SwiftUI
 
-struct CameraManualStepView: View{
+struct CameraManualStepView: View {
     let onBack: () -> Void
     let onStartCamera: () -> Void
     @Binding var manualExposure: Double
@@ -15,18 +15,18 @@ struct CameraManualStepView: View{
     @Binding var manualSaturation: Double
     @Binding var manualTemperature: Double
     @Binding var manualVignette: Double
-    
-    var body: some View{
-        VStack(alignment: .leading, spacing: 16) {
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: LensNoteTheme.Spacing.sm) {
             HStack {
-                backButton(action: onBack)
+                CameraBackButton(action: onBack)
                 Spacer()
             }
-            
+
             Text("수동 필터 설정")
-                .font(.system(size: 22, weight: .semibold))
-                .foregroundStyle(.white)
-            
+                .font(LensNoteTheme.Typography.sectionTitle)
+                .foregroundStyle(LensNoteTheme.Colors.textPrimary)
+
             manualSlider(title: "Exposure", value: $manualExposure)
             manualSlider(title: "Contrast", value: $manualContrast)
             manualSlider(title: "Saturation", value: $manualSaturation)
@@ -34,48 +34,35 @@ struct CameraManualStepView: View{
             manualSlider(title: "Vignette", value: $manualVignette, range: 0...1)
 
             Button("적용하고 카메라 시작", action: onStartCamera)
-            .buttonStyle(PrimaryCameraButtonStyle())
-            .padding(.top, 8)
+                .buttonStyle(PrimaryCameraButtonStyle())
+                .padding(.top, LensNoteTheme.Spacing.xxs)
 
             Spacer()
-            
-        }.padding(16)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Color.black)
-    }
-    private func backButton(action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: "chevron.left")
-                .font(.system(size: 15, weight: .semibold))
-                .frame(width: 36, height: 36)
-                .background(Color.white.opacity(0.12))
-                .clipShape(Circle())
         }
-        .buttonStyle(.plain)
-        .foregroundStyle(.white)
-        .accessibilityLabel("뒤로")
+        .padding(LensNoteTheme.Spacing.sm)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(LensNoteTheme.Colors.surface)
     }
+
     private func manualSlider(title: String, value: Binding<Double>, range: ClosedRange<Double> = -1...1) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
                 Text(title)
-                    .font(.headline)
-                    .foregroundStyle(.white)
+                    .font(LensNoteTheme.Typography.bodyStrong)
+                    .foregroundStyle(LensNoteTheme.Colors.textPrimary)
                 Spacer()
                 Text(String(format: "%.2f", value.wrappedValue))
-                    .font(.footnote.monospacedDigit())
-                    .foregroundStyle(.white.opacity(0.8))
+                    .font(LensNoteTheme.Typography.technical)
+                    .foregroundStyle(LensNoteTheme.Colors.textTertiary)
             }
             Slider(value: value, in: range)
-                .tint(.cyan)
+                .tint(LensNoteTheme.Colors.accentCyan)
         }
-        .padding(12)
-        .background(Color.white.opacity(0.08))
-        .clipShape(RoundedRectangle(cornerRadius: CameraDesign.cardRadius, style: .continuous))
+        .padding(LensNoteTheme.Spacing.xs)
+        .background(LensNoteTheme.Colors.cardOverlay)
+        .clipShape(RoundedRectangle(cornerRadius: LensNoteTheme.Radius.card, style: .continuous))
     }
 }
-
-
 
 private struct CameraManualStepPreviewWrapper: View {
     @State private var manualExposure: Double = 0.0
@@ -83,10 +70,15 @@ private struct CameraManualStepPreviewWrapper: View {
     @State private var manualSaturation: Double = 0.0
     @State private var manualTemperature: Double = 0.0
     @State private var manualVignette: Double = 0.0
-    
+
     var body: some View {
         CameraManualStepView(
-            onBack: {}, onStartCamera: {}, manualExposure: $manualExposure, manualContrast: $manualContrast, manualSaturation: $manualSaturation, manualTemperature: $manualTemperature, manualVignette: $manualVignette
+            onBack: {}, onStartCamera: {},
+            manualExposure: $manualExposure,
+            manualContrast: $manualContrast,
+            manualSaturation: $manualSaturation,
+            manualTemperature: $manualTemperature,
+            manualVignette: $manualVignette
         )
     }
 }

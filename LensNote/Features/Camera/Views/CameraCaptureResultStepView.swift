@@ -7,92 +7,80 @@
 
 import SwiftUI
 
-struct CameraCaptureResultStepView: View{
+struct CameraCaptureResultStepView: View {
     let capturedImage: UIImage?
     let lastSaved: PhotoItem?
     let errorMessage: String?
-    
+
     let onBack: () -> Void
     let onRetake: () -> Void
     let onSave: () -> Void
-    
-    var body: some View{
-        VStack(spacing: CameraDesign.sectionSpacing) {
+
+    var body: some View {
+        VStack(spacing: LensNoteTheme.Spacing.sm) {
             HStack {
-                backButton(action: onBack)
+                CameraBackButton(action: onBack)
                 Spacer()
             }
-            
+
             Spacer()
-            
-            RoundedRectangle(cornerRadius: 28, style: .continuous)
-                .fill(Color.white.opacity(0.08))
+
+            RoundedRectangle(cornerRadius: LensNoteTheme.Radius.cardLarge, style: .continuous)
+                .fill(LensNoteTheme.Colors.cardOverlay)
                 .overlay {
                     if let capturedImage {
                         Image(uiImage: capturedImage)
                             .resizable()
                             .scaledToFill()
                     } else {
-                        VStack(spacing: 8) {
+                        VStack(spacing: LensNoteTheme.Spacing.xxs) {
                             Image(systemName: "photo")
                                 .font(.system(size: 44, weight: .medium))
+                                .foregroundStyle(LensNoteTheme.Colors.textTertiary)
                             Text("Captured Preview")
-                                .font(.headline)
-                                .foregroundStyle(.white.opacity(0.86))
+                                .font(LensNoteTheme.Typography.bodyStrong)
+                                .foregroundStyle(LensNoteTheme.Colors.textTertiary)
                         }
                     }
                 }
                 .frame(height: 320)
-                .clipped()
-            
-            HStack(spacing: 12) {
+                .clipShape(RoundedRectangle(cornerRadius: LensNoteTheme.Radius.cardLarge, style: .continuous))
+
+            HStack(spacing: LensNoteTheme.Spacing.xs) {
                 Button("다시 찍기", action: onRetake)
-                .buttonStyle(SecondaryCameraButtonStyle())
-                
+                    .buttonStyle(SecondaryCameraButtonStyle())
+
                 Button("저장하기", action: onSave)
-                .buttonStyle(PrimaryCameraButtonStyle())
+                    .buttonStyle(PrimaryCameraButtonStyle())
             }
-            
+
             if let saved = lastSaved {
                 Text("Saved: \(saved.id.uuidString.prefix(8))...")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .font(LensNoteTheme.Typography.technical)
+                    .foregroundStyle(LensNoteTheme.Colors.textTertiary)
             }
-            
+
             if let err = errorMessage {
                 Text("Error: \(err)")
-                    .font(.footnote)
-                    .foregroundStyle(.red)
+                    .font(LensNoteTheme.Typography.body)
+                    .foregroundStyle(LensNoteTheme.Colors.danger)
             }
-            
+
             Spacer()
         }
-        .foregroundStyle(.white)
-        .padding(CameraDesign.screenPadding)
+        .foregroundStyle(LensNoteTheme.Colors.textPrimary)
+        .padding(LensNoteTheme.Spacing.sm)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.black)
+        .background(LensNoteTheme.Colors.surface)
     }
 }
 
-private func backButton(action: @escaping () -> Void) -> some View {
-    Button(action: action) {
-        Image(systemName: "chevron.left")
-            .font(.system(size: 15, weight: .semibold))
-            .frame(width: 36, height: 36)
-            .background(Color.white.opacity(0.12))
-            .clipShape(Circle())
-    }
-    .buttonStyle(.plain)
-    .foregroundStyle(.white)
-    .accessibilityLabel("뒤로")
-}
-
-private struct CamraCaptureResultStepPreviewWrapper: View {
+private struct CameraCaptureResultStepPreviewWrapper: View {
     let capturedImage: UIImage?
     let lastSaved: PhotoItem?
     let errorMessage: String?
 
-    var body: some View{
+    var body: some View {
         CameraCaptureResultStepView(
             capturedImage: capturedImage,
             lastSaved: lastSaved,
@@ -102,11 +90,10 @@ private struct CamraCaptureResultStepPreviewWrapper: View {
             onSave: {}
         )
     }
-    
 }
 
 #Preview("Empty") {
-    CamraCaptureResultStepPreviewWrapper(
+    CameraCaptureResultStepPreviewWrapper(
         capturedImage: nil,
         lastSaved: nil,
         errorMessage: nil
@@ -114,7 +101,7 @@ private struct CamraCaptureResultStepPreviewWrapper: View {
 }
 
 #Preview("Captured") {
-    CamraCaptureResultStepPreviewWrapper(
+    CameraCaptureResultStepPreviewWrapper(
         capturedImage: UIImage(systemName: "photo.fill"),
         lastSaved: nil,
         errorMessage: nil

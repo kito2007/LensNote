@@ -49,3 +49,22 @@ struct HeaderIconButtonStyle: ButtonStyle {
             .opacity(configuration.isPressed ? 0.8 : 1)
     }
 }
+
+/// 카메라 플로우 공통 뒤로가기 버튼 — 모든 스텝 뷰에서 재사용.
+struct CameraBackButton: View {
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "chevron.left")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(LensNoteTheme.Colors.textPrimary)
+                .frame(width: 40, height: 40)
+                .background(LensNoteTheme.Colors.sideControlBg)
+                .background(.ultraThinMaterial)
+                .clipShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("뒤로")
+    }
+}

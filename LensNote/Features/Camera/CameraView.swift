@@ -191,16 +191,23 @@ struct CameraView: View {
     }
     
     private var successToast: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: LensNoteTheme.Spacing.xxs) {
             Image(systemName: "checkmark.circle.fill")
-                .foregroundStyle(.green)
+                .foregroundStyle(LensNoteTheme.Colors.success)
             Text("사진이 저장되었습니다.")
-                .font(.headline)
+                .font(LensNoteTheme.Typography.bodyStrong)
+                .foregroundStyle(LensNoteTheme.Colors.textPrimary)
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .background(.ultraThinMaterial)
+        .padding(.horizontal, LensNoteTheme.Spacing.sm)
+        .padding(.vertical, LensNoteTheme.Spacing.xs)
+        .background(
+            ZStack {
+                LensNoteTheme.Colors.surfaceHigh
+                Color.clear.background(.ultraThinMaterial)
+            }
+        )
         .clipShape(Capsule())
+        .shadow(color: LensNoteTheme.Shadow.ambient, radius: 12, y: 4)
         .padding(.top, 60)
         .frame(maxHeight: .infinity, alignment: .top)
     }
