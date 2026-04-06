@@ -44,6 +44,16 @@ final class CameraViewModel: NSObject, ObservableObject {
     /// 위치 정보 없이 사진이 저장됐을 때 true — 토스트 표시 후 false로 리셋된다.
     @Published var hasLocationWarning: Bool = false
 
+    // MARK: - CoreML AI 추론 결과 (RealTimeInferenceEngine)
+    /// AI가 감지한 장면 유형 레이블 (예: "PORTRAIT", "LANDSCAPE").
+    @Published var sceneLabel: String = "STANDARD"
+    /// AI 종합 추론 점수 (0~1).
+    @Published var inferenceScore: Double = 0.0
+    /// AI가 감지한 피사체 바운딩 박스 (정규화 좌표 0~1).
+    @Published var coreMLSubjectBox: CGRect? = nil
+    /// AI 기반 구도 힌트 문구.
+    @Published var coreMLGuidanceHint: String? = nil
+
     let session = AVCaptureSession()
 
     private let sessionQueue = DispatchQueue(label: "CameraSessionQueue")
@@ -52,6 +62,8 @@ final class CameraViewModel: NSObject, ObservableObject {
     private let photoOutput = AVCapturePhotoOutput()
     // 카메라 프레임 -> 구도 가이드 결과를 만드는 엔진
     private nonisolated(unsafe) let guidanceEngine = CompositionGuidanceEngine()
+    // CoreML 실시간 AI 추론 엔진 (MobileNetV2 + DeepLabV3)
+    private nonisolated(unsafe) let inferenceEngine = RealTimeInferenceEngine()
     // CoreMotion에서 기기 자세를 받아오는 제공자.
     private nonisolated(unsafe) let devicePoseProvider: DevicePoseProviding
     // 모델 학습/평가를 위한 프레임-가이드 샘플 기록기(JSONL)
@@ -328,10 +340,28 @@ extension CameraViewModel: AVCaptureVideoDataOutputSampleBufferDelegate {
             let accepted = self.applyGuidanceResult(result)
             self.guidanceDatasetRecorder.record(result: result, concept: self.conceptText, acceptedForUI: accepted)
         }
+
+        // CoreML 실시간 AI 추론 (스케줄러 스로틀링 내장 — 모델 로드 실패 시 nil 반환)
+        guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
+        if let inferenceOutput = inferenceEngine.analyze(pixelBuffer: pixelBuffer) {
+            Task { @MainActor [weak self] in
+                self?.applyInferenceOutput(inferenceOutput)
+            }
+        }
     }
 }
 
 private extension CameraViewModel {
+    /// CoreML AI 추론 결과를 Published 프로퍼티에 반영한다.
+    /// 기존 Vision 기반 guidanceMessage/overlayState는 건드리지 않는다.
+    @MainActor
+    func applyInferenceOutput(_ output: AIInferenceOutput) {
+        sceneLabel = output.sceneLabel
+        inferenceScore = output.inferenceScore
+        coreMLSubjectBox = output.subjectBoundingBox
+        coreMLGuidanceHint = output.guidanceHint
+    }
+
     func applyGuidanceResult(_ result: CompositionGuidanceResult) -> Bool {
         // 메시지를 UI에 반영하기 전에 점수/촬영 가능 상태는 즉시 업데이트한다.
         guidanceScore = result.evaluation.overallScore

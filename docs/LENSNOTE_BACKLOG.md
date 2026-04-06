@@ -14,12 +14,12 @@
 - [x] Fix camera live view tab bar overlap.
   Done: `FloatingDockBar` hidden when `isLiveCamera = true` via binding in `CameraView` / `RootView`. Real-device verified. (2026-04-01)
 
-- [ ] **전체 디자인 개선** ← 우선순위 상향 (2026-04-01)
+- [x] **전체 디자인 개선** ← 우선순위 상향 (2026-04-01)
   Why: 맵에 사진이 많아지면 핀 식별이 어렵고, 각 화면의 시각 언어가 아직 불완전함. 테스트 편의성을 위해서도 필요.
   Scope:
     - ~~Map: 핀 상세 카드 개선, 빈 상태 화면, 권한 안내 화면~~ ✅ Done (2026-04-02)
-    - Camera: 라이브 뷰 어시스턴트 패널 레이아웃, 구도 오버레이 정리
-    - 전체: dark cinematic + cyan accent 언어 통일
+    - ~~Camera: 라이브 뷰 어시스턴트 패널 레이아웃, 구도 오버레이 정리~~ ✅ Done (2026-04-05)
+    - 전체: dark cinematic + cyan accent 언어 통일 — 맵/카메라 완료, 홈 화면 남음
   Owner: `lensnote-designer` → `lensnote-ios-engineer` → `lensnote-simulator-qa`
 
 - [ ] Finish the camera onboarding and transition flow end-to-end.
@@ -67,8 +67,8 @@
 ## Recommended Execution Order
 
 1. ~~Resolve saved photo and map data flow strategy.~~ ✅ Done
-2. **전체 디자인 개선** (~~맵~~ ✅ → 카메라 → 홈 순서) ← 현재 여기
-3. Finish camera flow and live guidance usability.
+2. ~~**전체 디자인 개선**~~ (~~맵~~ ✅ → ~~카메라~~ ✅ → 홈 남음) ✅ 맵/카메라 Done
+3. Finish camera flow and live guidance usability. ← 현재 여기
 4. Strengthen map experience around the chosen data strategy.
 5. Expose filter recommendation more clearly.
 6. Improve runtime testability with accessibility identifiers and simulator scenarios.

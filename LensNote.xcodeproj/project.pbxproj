@@ -6,8 +6,15 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		4CE77BF02F83E10800196678 /* DeepLabV3.mlmodel in Sources */ = {isa = PBXBuildFile; fileRef = 4CE77BEE2F83E10800196678 /* DeepLabV3.mlmodel */; };
+		4CE77BF12F83E10800196678 /* MobileNetV2.mlmodel in Sources */ = {isa = PBXBuildFile; fileRef = 4CE77BEF2F83E10800196678 /* MobileNetV2.mlmodel */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		4C4FB6FD2EF3CA10007AB71A /* LensNote.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LensNote.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		4CE77BEE2F83E10800196678 /* DeepLabV3.mlmodel */ = {isa = PBXFileReference; lastKnownFileType = file.mlmodel; path = DeepLabV3.mlmodel; sourceTree = "<group>"; };
+		4CE77BEF2F83E10800196678 /* MobileNetV2.mlmodel */ = {isa = PBXFileReference; lastKnownFileType = file.mlmodel; path = MobileNetV2.mlmodel; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -34,6 +41,8 @@
 			children = (
 				4C4FB6FF2EF3CA10007AB71A /* LensNote */,
 				4C4FB6FE2EF3CA10007AB71A /* Products */,
+				4CE77BEE2F83E10800196678 /* DeepLabV3.mlmodel */,
+				4CE77BEF2F83E10800196678 /* MobileNetV2.mlmodel */,
 			);
 			sourceTree = "<group>";
 		};
@@ -119,6 +128,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				4CE77BF02F83E10800196678 /* DeepLabV3.mlmodel in Sources */,
+				4CE77BF12F83E10800196678 /* MobileNetV2.mlmodel in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

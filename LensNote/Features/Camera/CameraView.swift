@@ -119,6 +119,8 @@ struct CameraView: View {
                     isCapturingPhoto: viewModel.isCapturingPhoto,
                     recommendation: assistService.recommendation(from: viewModel.preset, concept: viewModel.conceptText),
                     tips: assistService.compositionTips(concept: viewModel.conceptText, guidance: viewModel.guidanceMessage),
+                    sceneLabel: viewModel.sceneLabel,
+                    inferenceScore: viewModel.inferenceScore,
                     onBack: { step = .select },
                     onToggleGrid: { showGrid.toggle() },
                     onCapture: {

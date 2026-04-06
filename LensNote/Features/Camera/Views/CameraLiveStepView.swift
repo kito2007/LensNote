@@ -20,6 +20,10 @@ struct CameraLiveStepView: View {
     let isCapturingPhoto: Bool
     let recommendation: CameraRecommendation
     let tips: [String]
+    /// AI 장면 분류 레이블 (예: "PORTRAIT"). conceptText가 비면 이 값이 FILTER 칩에 표시된다.
+    var sceneLabel: String = "STANDARD"
+    /// CoreML 종합 추론 점수 (0~1). guidanceScore와 함께 SCORE 칩에 표시된다.
+    var inferenceScore: Double = 0.0
 
     let onBack: () -> Void
     let onToggleGrid: () -> Void
@@ -137,12 +141,12 @@ struct CameraLiveStepView: View {
 
     private var aiAnalysisChips: some View {
         VStack(alignment: .leading, spacing: LensNoteTheme.Spacing.xs) {
-            // Chip 1: Filter/Concept — tertiary icon
+            // Chip 1: Filter/Concept — AI 장면 분류 레이블, conceptText가 있으면 우선 표시
             analysisChip(
                 icon: "paintpalette.fill",
                 iconColor: LensNoteTheme.Colors.tertiary,
                 label: "FILTER",
-                value: conceptText.isEmpty ? "STANDARD" : conceptText.uppercased()
+                value: conceptText.isEmpty ? sceneLabel : conceptText.uppercased()
             )
 
             // Chip 2: Camera settings — primary icon
@@ -153,12 +157,12 @@ struct CameraLiveStepView: View {
                 value: recommendation.iso.uppercased()
             )
 
-            // Chip 3: Guidance status — accentCyan icon
+            // Chip 3: Guidance score — CoreML inferenceScore 우선, fallback은 Vision guidanceScore
             analysisChip(
                 icon: "scope",
                 iconColor: LensNoteTheme.Colors.accentCyan,
                 label: "SCORE",
-                value: "\(Int(guidanceScore * 100))%"
+                value: "\(Int(max(inferenceScore, guidanceScore) * 100))%"
             )
         }
     }

@@ -13,6 +13,7 @@ The project has:
 - all feature branches merged and deleted — only `main` remains
 - **맵 탭 디자인 1차 개선 완료** (2026-04-02)
 - **카메라 디자인 전면 개선 완료** (2026-04-05)
+- **CoreML 실시간 AI 파이프라인 구현 완료** (2026-04-06)
 
 ## Current High-Level Goal
 
@@ -76,6 +77,47 @@ Finish LensNote into a coherent MVP/demo app:
 5. **하드코딩 색상 완전 제거 확인**
    - `Color.black`, `.yellow`, `.secondary`, `.white.opacity` → grep 0건 (Camera 디렉토리)
 
+## Completed Work (2026-04-06)
+
+CoreML 실시간 AI 추론 파이프라인 구현:
+
+1. **MobileNetV2Service.swift** 신규 생성
+   - Bundle에서 MobileNetV2.mlmodel lazy 로드 (VNCoreMLModel)
+   - ImageNet classLabel → SceneType 매핑 테이블 (portrait/landscape/cityStreet/food/pet/night/etc)
+   - `classify(pixelBuffer:) -> SceneClassificationResult?` — nonisolated, 세션 큐 직접 호출
+
+2. **DeepLabV3Service.swift** 신규 생성
+   - Bundle에서 DeepLabV3.mlmodel lazy 로드
+   - CIContext 기반 513x513 리사이즈 (MainActor 의존 없음)
+   - stepSize=8 stride 샘플링으로 성능 최적화
+   - `segment(pixelBuffer:) -> SegmentationResult?` — 바운딩박스, 커버리지, 삼등분선 편차 포함
+
+3. **AIInferenceAggregator.swift** 신규 생성
+   - 순수 static 함수 집합 — 상태 없음
+   - MobileNetV2 우선, DeepLabV3 person(index 15) 비율 5% 이상이면 portrait 오버라이드
+   - inferenceScore = confidence * 0.6 + 구도점수 * 0.4
+   - 삼등분선 편차 0.12 초과 시 방향 힌트 문구 생성
+
+4. **RealTimeInferenceEngine.swift** 신규 생성
+   - MobileNetV2Service + DeepLabV3Service 소유
+   - baseInterval 0.5초 내장 스로틀러 (Date 비교 방식)
+   - `analyze(pixelBuffer:) -> AIInferenceOutput?` — 두 모델 순차 실행 후 Aggregator 합성
+   - 두 모델 모두 실패 시 nil 반환 (graceful fallback)
+
+5. **CameraViewModel.swift** 수정
+   - `inferenceEngine = RealTimeInferenceEngine()` 추가
+   - `@Published sceneLabel`, `inferenceScore`, `coreMLSubjectBox`, `coreMLGuidanceHint` 추가
+   - `captureOutput()` 내 `inferenceEngine.analyze(pixelBuffer:)` 호출 추가
+   - `applyInferenceOutput(_ output:)` @MainActor 메서드 추가
+
+6. **CameraLiveStepView.swift** 수정
+   - `sceneLabel: String`, `inferenceScore: Double` 프로퍼티 추가 (기본값 있음)
+   - FILTER 칩: conceptText 없을 때 sceneLabel 표시 (AI 장면 분류)
+   - SCORE 칩: `max(inferenceScore, guidanceScore)` — CoreML 우선, Vision fallback
+
+7. **CameraView.swift** 수정
+   - CameraLiveStepView 호출부에 `sceneLabel:`, `inferenceScore:` 전달 추가
+
 ## Known Architectural State
 
 - Camera save flow → `SavePhotoUseCase` + `FilePhotoRepository` (JSON on disk).
@@ -92,16 +134,18 @@ Finish LensNote into a coherent MVP/demo app:
 - No automated test target exists. Manual QA is the only verification path.
 - Runtime persistence validation (camera → save → force-quit → relaunch → map pin) still not formally confirmed.
 - 카메라 사이드 버튼 액션 미연결 (map/photo library).
+- 모델 파일이 번들에 없으면 `classify`/`segment` 모두 nil을 반환하고 기존 Vision 가이드로 graceful fallback된다 (크래시 없음).
+- DeepLabV3 MLMultiArray 형상(shape)이 모델 버전에 따라 다를 수 있음. 현재 [513, 513] 가정. 실기기에서 동작 확인됨.
 
 ## Next Recommended Tasks (in priority order)
 
 > **다음 세션 시작점**: 아래 1번부터 시작.
 
-1. **Runtime validation** — camera → capture → save → force-quit → relaunch → map pin 확인 (수동 QA).
+1. **Live guidance UX 안정화** (backlog P0) — coreMLGuidanceHint를 UI에 노출, 메시지 안정성 튜닝.
 2. **카메라 온보딩 플로우 완성** (backlog P0) — 레퍼런스 사진 플로우, 분석 중 UX 등.
-3. **Live guidance UX 안정화** (backlog P0).
-4. **홈 화면 디자인 통일** — dark cinematic + cyan accent 언어 통일 (backlog 전체 디자인 개선 마지막 파트).
-5. **필터/컨셉 가시성** (backlog P1).
+3. **홈 화면 디자인 통일** — dark cinematic + cyan accent 언어 통일 (backlog 전체 디자인 개선 마지막 파트).
+4. **필터/컨셉 가시성** (backlog P1).
+5. **Runtime validation** — camera → capture → save → force-quit → relaunch → map pin 확인 (수동 QA).
 
 ## Verification Status
 
@@ -112,8 +156,10 @@ Finish LensNote into a coherent MVP/demo app:
 - **맵 탭 디자인 개선: build-verified** (`BUILD SUCCEEDED`, iPhone 17 Pro Simulator, iOS 26.4)
 - **카메라 디자인 개선: build-verified** (`BUILD SUCCEEDED`, iPhone 17 Pro Simulator, iOS 26.4)
 - 카메라 하드코딩 색상 제거 확인: `Color.black`, `.white.opacity` → grep 0건
+- **CoreML AI 파이프라인: 실기기 검증 완료** — FILTER 칩 장면 분류 동적 변경 확인됨
+- 모델 파일 번들 포함: Xcode 타겟 멤버 추가 완료
 - Branch state: main only
-- Last handoff: 2026-04-05
+- Last handoff: 2026-04-06
 
 ## Update Rule
 
