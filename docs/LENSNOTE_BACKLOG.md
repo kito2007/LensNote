@@ -22,10 +22,9 @@
     - 전체: dark cinematic + cyan accent 언어 통일 — 맵/카메라 완료, 홈 화면 남음
   Owner: `lensnote-designer` → `lensnote-ios-engineer` → `lensnote-simulator-qa`
 
-- [ ] Finish the camera onboarding and transition flow end-to-end.
-  Why: the user should be able to enter intent and reach live guidance without friction.
-  Note: 선택 화면 → 텍스트/레퍼런스/수동 → 라이브 뷰 전환은 구현됨. 레퍼런스 사진 분석 UX, 분석 중 상태 표시 등 세부 완성 필요.
-  Owner: `lensnote-designer` → `lensnote-ios-engineer` → `lensnote-simulator-qa`
+- [x] Finish the camera onboarding and transition flow end-to-end.
+  Done: 레퍼런스 분석을 3단계 애니메이션(톤/컬러/프리셋, ~1.8s)으로 시각화, 완료 후 프리셋 요약 카드 + 확정 CTA 노출, 라이브 뷰 REF 썸네일에 실제 레퍼런스 사진 반영. (2026-04-17)
+  Note: 실기기 체감 시간 튜닝은 별도 추적.
 
 - [x] Stabilize the live guidance UX.
   Done: `activeGuidanceHint` 통합 퍼블리셔 + CoreML 힌트 안정화(0.9s stability / 1.6s min display) + Vision fallback + 캡처 바 위 글래스 배너 노출. (2026-04-17)

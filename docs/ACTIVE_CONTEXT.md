@@ -119,7 +119,32 @@ CoreML 실시간 AI 추론 파이프라인 구현:
 7. **CameraView.swift** 수정
    - CameraLiveStepView 호출부에 `sceneLabel:`, `inferenceScore:` 전달 추가
 
-## Completed Work (2026-04-17)
+## Completed Work (2026-04-17 — onboarding flow)
+
+레퍼런스 사진 온보딩 플로우 완성:
+
+1. **CameraReferenceStepView.swift** 재작성
+   - `ReferenceAnalysisStage` enum 도입 (idle/extractingTone/extractingColor/generatingPreset/completed).
+   - 분석 진행률 카드: 3단계 체크리스트(ProgressView → checkmark.circle.fill 전환), 완료 후 생성된 FilterPreset 요약 섹션.
+   - 프리셋 요약 바: 노출/대비/채도/온도/비네트 각각 중앙 기준 -1~1 슬라이더 시각화(accentCyan fill).
+   - 빈 상태 안내 카드 추가 — "원하는 톤의 사진을 고르면 LensNote가 프리셋을 만들어요."
+   - 완료 시 `"이 톤으로 촬영 시작"` hero gradient CTA 노출 (자동 점프 제거).
+   - "다른 사진 선택" 라벨로 재선택 지원.
+
+2. **CameraView.swift**
+   - `isAnalyzing: Bool` → `referenceAnalysisStage: ReferenceAnalysisStage` + `referenceGeneratedPreset: FilterPreset?` state 교체.
+   - `analyzeReferencePhotoAndMove()` 재작성: 650ms+650ms+500ms 단계적 스테이지 진행.
+   - `onConfirm` 콜백에서 preset 적용 후 `.camera` 단계 전환.
+   - `resetReferenceFlow()` 헬퍼: 뒤로가기 시 상태/이미지/picker 모두 초기화.
+   - `selectedReferenceImage`를 `CameraLiveStepView`에 전달.
+
+3. **CameraLiveStepView.swift**
+   - `referenceImage: UIImage?` 프로퍼티 추가.
+   - `referenceThumb`가 실제 이미지가 있으면 원형 크롭으로 표시, 없으면 기존 placeholder 아이콘 유지.
+
+Build: ✅ BUILD SUCCEEDED (iPhone 17 Pro, iOS 26.4).
+
+## Completed Work (2026-04-17 — live guidance)
 
 Live guidance UX 안정화 — CoreML/Vision 힌트를 화면에 노출:
 
@@ -165,10 +190,10 @@ Build: ✅ BUILD SUCCEEDED (iPhone 17 Pro, iOS 26.4).
 
 > **다음 세션 시작점**: 아래 1번부터 시작.
 
-1. **Live guidance 실기기 튜닝** — 안정화 파라미터(0.9s stability / 1.6s min display)가 체감상 적절한지, 배너 위치가 캡처 버튼과 겹치지 않는지 확인.
-2. **카메라 온보딩 플로우 완성** (backlog P0) — 레퍼런스 사진 플로우, 분석 중 UX 등.
-3. **홈 화면 디자인 통일** — dark cinematic + cyan accent 언어 통일 (backlog 전체 디자인 개선 마지막 파트).
-4. **필터/컨셉 가시성** (backlog P1).
+1. **홈 화면 디자인 통일** — dark cinematic + cyan accent 언어 통일 (backlog 전체 디자인 개선 마지막 파트).
+2. **필터/컨셉 가시성** (backlog P1) — CameraConceptStepView에서 입력한 컨셉이 프리셋 추천에 반영되는 흐름을 시각적으로 더 명확히.
+3. **Live guidance 실기기 튜닝** — 안정화 파라미터(0.9s stability / 1.6s min display)가 체감상 적절한지, 배너 위치가 캡처 버튼과 겹치지 않는지 확인.
+4. **레퍼런스 분석 시간 체감 튜닝** — 1.8초가 적절한지, 단계 문구가 의미 있는지 실기기 확인.
 5. **Runtime validation** — camera → capture → save → force-quit → relaunch → map pin 확인 (수동 QA).
 
 ## Verification Status
@@ -183,6 +208,7 @@ Build: ✅ BUILD SUCCEEDED (iPhone 17 Pro, iOS 26.4).
 - **CoreML AI 파이프라인: 실기기 검증 완료** — FILTER 칩 장면 분류 동적 변경 확인됨
 - 모델 파일 번들 포함: Xcode 타겟 멤버 추가 완료
 - **Live guidance UX: build-verified** (`BUILD SUCCEEDED`, iPhone 17 Pro Simulator, iOS 26.4) — 실기기 체감 튜닝은 다음 세션에서
+- **레퍼런스 온보딩 플로우: build-verified** (`BUILD SUCCEEDED`, iPhone 17 Pro Simulator, iOS 26.4) — 실기기 체감 튜닝은 다음 세션에서
 - Branch state: main only
 - Last handoff: 2026-04-17
 

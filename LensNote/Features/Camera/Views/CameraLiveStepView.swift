@@ -26,6 +26,8 @@ struct CameraLiveStepView: View {
     var inferenceScore: Double = 0.0
     /// 화면에 실제로 노출할 구도 힌트 문구. nil이면 배너를 숨긴다.
     var activeGuidanceHint: String? = nil
+    /// 사용자가 업로드한 레퍼런스 이미지. nil이면 REF 썸네일에 placeholder가 표시된다.
+    var referenceImage: UIImage? = nil
 
     let onBack: () -> Void
     let onToggleGrid: () -> Void
@@ -293,14 +295,28 @@ struct CameraLiveStepView: View {
 
     private var referenceThumb: some View {
         ZStack(alignment: .topTrailing) {
-            Circle()
-                .stroke(LensNoteTheme.Colors.primary, lineWidth: 2)
-                .frame(width: 64, height: 64)
-                .overlay(
-                    Image(systemName: "photo.fill")
-                        .font(.system(size: 22))
-                        .foregroundStyle(LensNoteTheme.Colors.textSecondary)
-                )
+            Group {
+                if let referenceImage {
+                    Image(uiImage: referenceImage)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 64, height: 64)
+                        .clipShape(Circle())
+                        .overlay(
+                            Circle()
+                                .stroke(LensNoteTheme.Colors.primary, lineWidth: 2)
+                        )
+                } else {
+                    Circle()
+                        .stroke(LensNoteTheme.Colors.primary, lineWidth: 2)
+                        .frame(width: 64, height: 64)
+                        .overlay(
+                            Image(systemName: "photo.fill")
+                                .font(.system(size: 22))
+                                .foregroundStyle(LensNoteTheme.Colors.textSecondary)
+                        )
+                }
+            }
 
             Text("REF")
                 .font(.system(size: 10, weight: .bold))

@@ -47,7 +47,8 @@ struct CameraView: View {
     @State private var manualTemperature: Double = 0.0
     @State private var manualVignette: Double = 0.0
     
-    @State private var isAnalyzing: Bool = false
+    @State private var referenceAnalysisStage: ReferenceAnalysisStage = .idle
+    @State private var referenceGeneratedPreset: FilterPreset? = nil
     @State private var showGrid: Bool = true
     @State private var showSaveSuccess: Bool = false
     
@@ -72,8 +73,15 @@ struct CameraView: View {
                 CameraReferenceStepView(
                     referencePickerItem: $referencePickerItem,
                     selectedReferenceImage: selectedReferenceImage,
-                    isAnalyzing: isAnalyzing,
-                    onBack: {step = .select}
+                    analysisStage: referenceAnalysisStage,
+                    generatedPreset: referenceGeneratedPreset,
+                    onBack: { resetReferenceFlow(); step = .select },
+                    onConfirm: {
+                        guard let preset = referenceGeneratedPreset else { return }
+                        viewModel.preset = preset
+                        viewModel.conceptText = "Reference Mood"
+                        step = .camera
+                    }
                 )
             case .text:
                 CameraConceptStepView(
@@ -122,6 +130,7 @@ struct CameraView: View {
                     sceneLabel: viewModel.sceneLabel,
                     inferenceScore: viewModel.inferenceScore,
                     activeGuidanceHint: viewModel.activeGuidanceHint,
+                    referenceImage: selectedReferenceImage,
                     onBack: { step = .select },
                     onToggleGrid: { showGrid.toggle() },
                     onCapture: {
@@ -256,17 +265,31 @@ struct CameraView: View {
     }
     
     private func analyzeReferencePhotoAndMove(image: UIImage) {
-        guard !isAnalyzing else { return }
-        isAnalyzing = true
-        
+        guard referenceAnalysisStage == .idle || referenceAnalysisStage == .completed else { return }
+        referenceGeneratedPreset = nil
+        referenceAnalysisStage = .extractingTone
+
         Task { @MainActor in
-            // UX용 짧은 지연 후 분석 결과를 반영
-            try? await Task.sleep(nanoseconds: 900_000_000)
-            viewModel.preset = assistService.analyzeReferenceImage(image)
-            viewModel.conceptText = "Reference Mood"
-            isAnalyzing = false
-            step = .camera
+            // 3단계 분석 애니메이션 — 총 ~1.8초.
+            try? await Task.sleep(nanoseconds: 650_000_000)
+            referenceAnalysisStage = .extractingColor
+            try? await Task.sleep(nanoseconds: 650_000_000)
+            referenceAnalysisStage = .generatingPreset
+
+            // 실제 프리셋 분석은 이 시점에 수행
+            let preset = assistService.analyzeReferenceImage(image)
+
+            try? await Task.sleep(nanoseconds: 500_000_000)
+            referenceGeneratedPreset = preset
+            referenceAnalysisStage = .completed
         }
+    }
+
+    private func resetReferenceFlow() {
+        referenceAnalysisStage = .idle
+        referenceGeneratedPreset = nil
+        selectedReferenceImage = nil
+        referencePickerItem = nil
     }
     
     private func showTransientSuccess() {
