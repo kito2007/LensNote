@@ -15,6 +15,7 @@ The project has:
 - **카메라 디자인 전면 개선 완료** (2026-04-05)
 - **CoreML 실시간 AI 파이프라인 구현 완료** (2026-04-06)
 - **Live guidance UX 안정화 — 배너 노출 + 힌트 디바운스** (2026-04-17)
+- **홈 화면 디자인 통일 — Quick Shot 수직 재배치 + Map Gallery preview + Recent Sessions 썸네일** (2026-04-18)
 
 ## Current High-Level Goal
 
@@ -167,6 +168,31 @@ Live guidance UX 안정화 — CoreML/Vision 힌트를 화면에 노출:
 
 Build: ✅ BUILD SUCCEEDED (iPhone 17 Pro, iOS 26.4).
 
+## Completed Work (2026-04-18 — home screen)
+
+홈 화면 디자인 전면 개선 — stitch `home_entry_point` 레퍼런스 준수:
+
+1. **Quick Shot 카드 — 수직 재배치**
+   - 기존 좌측 52pt 아이콘 + 우측 "Open Camera" 캡슐 버튼(horizontal)
+   - 신규 vertical stack: 상단 52pt primary-container 아이콘 칩 → 제목 + 설명 → 하단 full-width "Open Camera" pill(surfaceHighest bg + primary/25 stroke + primary text)
+   - 설명 문구를 "Manual pro controls with instant metadata logging."로 교체(stitch 원문)
+
+2. **`mapGalleryCard` 신규 — Captured Moments 탭 가능 preview**
+   - 기존 generic empty state(photo.on.rectangle.angled) 제거
+   - dark map-gradient 배경 + 회전된 `map.fill` 워터마크(tertiary/10)
+   - 좌상단 40pt 글래스 원형 칩(map.fill, tertiary tint, chipBorder stroke)
+   - 하단 글래스 footer(surface/55 + ultraThinMaterial): "Captured Moments" 제목 + 3색(primary/tertiary/accentCyan) avatar stack + "128 PLACES" microLabel
+   - 카드 전체가 Button → `onOpenMapGallery` 호출
+   - 높이 170pt, cardLarge radius
+
+3. **Recent Sessions — 썸네일 + gear 라벨로 스타일 통일**
+   - 원형 아이콘 → 56pt rounded-14 그라데이션 썸네일(accentColor topLeading→bottomTrailing + photo.fill watermark)
+   - 서브타이틀을 "오늘 · 4장" 등 한국어 날짜에서 카메라 gear 문구로 교체("Fujifilm X-T4 · 35mm f/2.0", "Sony A7IV · 24mm f/1.4", "Leica Q2 · 28mm f/1.7")
+   - `RecentSession.Trailing` 열거형 추가: `.match(percent:)` / `.timeAgo(String)`, 각각 accent 색과 tertiary 색 매핑
+   - Row 컨테이너: `surfaceLow` 카드 배경 + chevron.right 동반 표시
+
+Build: ✅ BUILD SUCCEEDED (iPhone 17 Pro, iOS 26.4).
+
 ## Known Architectural State
 
 - Camera save flow → `SavePhotoUseCase` + `FilePhotoRepository` (JSON on disk).
@@ -190,8 +216,8 @@ Build: ✅ BUILD SUCCEEDED (iPhone 17 Pro, iOS 26.4).
 
 > **다음 세션 시작점**: 아래 1번부터 시작.
 
-1. **홈 화면 디자인 통일** — dark cinematic + cyan accent 언어 통일 (backlog 전체 디자인 개선 마지막 파트).
-2. **필터/컨셉 가시성** (backlog P1) — CameraConceptStepView에서 입력한 컨셉이 프리셋 추천에 반영되는 흐름을 시각적으로 더 명확히.
+1. **필터/컨셉 가시성** (backlog P1) — CameraConceptStepView에서 입력한 컨셉이 프리셋 추천에 반영되는 흐름을 시각적으로 더 명확히.
+2. **Capture result feedback 강화** (backlog P1) — 저장 완료 토스트 이상의 확신을 줄 수 있는 후반 플로우 디자인.
 3. **Live guidance 실기기 튜닝** — 안정화 파라미터(0.9s stability / 1.6s min display)가 체감상 적절한지, 배너 위치가 캡처 버튼과 겹치지 않는지 확인.
 4. **레퍼런스 분석 시간 체감 튜닝** — 1.8초가 적절한지, 단계 문구가 의미 있는지 실기기 확인.
 5. **Runtime validation** — camera → capture → save → force-quit → relaunch → map pin 확인 (수동 QA).
@@ -209,8 +235,9 @@ Build: ✅ BUILD SUCCEEDED (iPhone 17 Pro, iOS 26.4).
 - 모델 파일 번들 포함: Xcode 타겟 멤버 추가 완료
 - **Live guidance UX: build-verified** (`BUILD SUCCEEDED`, iPhone 17 Pro Simulator, iOS 26.4) — 실기기 체감 튜닝은 다음 세션에서
 - **레퍼런스 온보딩 플로우: build-verified** (`BUILD SUCCEEDED`, iPhone 17 Pro Simulator, iOS 26.4) — 실기기 체감 튜닝은 다음 세션에서
+- **홈 화면 디자인 개선: build-verified** (`BUILD SUCCEEDED`, iPhone 17 Pro Simulator, iOS 26.4) — 실기기 확인은 다음 세션
 - Branch state: main only
-- Last handoff: 2026-04-17
+- Last handoff: 2026-04-18
 
 ## Update Rule
 

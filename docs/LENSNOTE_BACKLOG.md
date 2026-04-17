@@ -19,7 +19,7 @@
   Scope:
     - ~~Map: 핀 상세 카드 개선, 빈 상태 화면, 권한 안내 화면~~ ✅ Done (2026-04-02)
     - ~~Camera: 라이브 뷰 어시스턴트 패널 레이아웃, 구도 오버레이 정리~~ ✅ Done (2026-04-05)
-    - 전체: dark cinematic + cyan accent 언어 통일 — 맵/카메라 완료, 홈 화면 남음
+    - ~~Home: Quick Shot 수직 재배치, Map Gallery preview, Recent Sessions 썸네일+gear 라벨~~ ✅ Done (2026-04-18)
   Owner: `lensnote-designer` → `lensnote-ios-engineer` → `lensnote-simulator-qa`
 
 - [x] Finish the camera onboarding and transition flow end-to-end.
@@ -66,9 +66,9 @@
 ## Recommended Execution Order
 
 1. ~~Resolve saved photo and map data flow strategy.~~ ✅ Done
-2. ~~**전체 디자인 개선**~~ (~~맵~~ ✅ → ~~카메라~~ ✅ → 홈 남음) ✅ 맵/카메라 Done
-3. Finish camera flow and live guidance usability. ← 현재 여기
+2. ~~**전체 디자인 개선**~~ (~~맵~~ ✅ → ~~카메라~~ ✅ → ~~홈~~ ✅) ✅ Done (2026-04-18)
+3. ~~Finish camera flow and live guidance usability.~~ ✅ Done (2026-04-17)
 4. Strengthen map experience around the chosen data strategy.
-5. Expose filter recommendation more clearly.
+5. Expose filter recommendation more clearly. ← 현재 여기 (P1)
 6. Improve runtime testability with accessibility identifiers and simulator scenarios.
 7. Polish and demo preparation.
