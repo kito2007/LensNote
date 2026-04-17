@@ -16,6 +16,7 @@ The project has:
 - **CoreML 실시간 AI 파이프라인 구현 완료** (2026-04-06)
 - **Live guidance UX 안정화 — 배너 노출 + 힌트 디바운스** (2026-04-17)
 - **홈 화면 디자인 통일 — Quick Shot 수직 재배치 + Map Gallery preview + Recent Sessions 썸네일** (2026-04-18)
+- **컨셉 입력 실시간 프리셋 미리보기 — PresetSummaryView 공용 추출 + suggestion chips + CTA 반영** (2026-04-18)
 
 ## Current High-Level Goal
 
@@ -193,6 +194,35 @@ Build: ✅ BUILD SUCCEEDED (iPhone 17 Pro, iOS 26.4).
 
 Build: ✅ BUILD SUCCEEDED (iPhone 17 Pro, iOS 26.4).
 
+## Completed Work (2026-04-18 — concept preset visibility)
+
+필터/컨셉 가시성(backlog P1) — CameraConceptStepView 전면 개선:
+
+1. **`FilterPreset.forConcept(_:)` static 메서드 신설**
+   - CameraViewModel에 있던 private `presetForConcept(_:)` 삭제.
+   - `FilterPreset`에 `.standard` 정적 상수 + `forConcept(_:)` 추가 — 뷰/뷰모델이 동일 룰 공유.
+   - 키워드 셋 확장: 기존 무드/빈티지/따뜻/차가운 + 야경, 인물, 풍경까지 매핑.
+
+2. **`PresetSummaryView.swift` 공용 컴포넌트 추출**
+   - CameraReferenceStepView의 `presetSummary` + `presetBar` + `formattedValue` 로직을 이관.
+   - `showsTitle` 옵션으로 제목 영역 토글 — 상위 뷰가 자체 제목을 노출하는 경우(컨셉 뷰) 대응.
+
+3. **CameraReferenceStepView 정리**
+   - 자체 `presetSummary`/`presetBar`/`formattedValue` 삭제.
+   - 분석 완료 시 `PresetSummaryView(preset:)` 호출로 대체 — 레퍼런스/컨셉 두 흐름이 동일한 시각 언어.
+
+4. **CameraConceptStepView 전면 재작성**
+   - 헤더: "컨셉 입력" + 보조 카피 "컨셉 키워드에 맞춰 필터 프리셋을 실시간으로 추천해요."
+   - **Suggestion chips 스크롤 행**: 야경/인물/풍경/무드/빈티지/따뜻한/차가운 — 탭 시 입력에 공백 조인해 누적, 이미 포함된 키워드는 accentCyan으로 활성 상태 표시.
+   - **실시간 프리뷰 카드**: `trimmed.isEmpty`가 false면 등장. 매칭 시 "추천 프리셋" 라벨 + preset 이름 chip + `PresetSummaryView`(제목 없이 바만). 매칭 실패 시 안내 문구 + questionmark 아이콘.
+   - **CTA 문구 동적 반영**: 매칭된 preset이 있으면 `"{preset.name}으로 시작"`, 아니면 기본 "카메라 시작". Hero gradient 배경 + elevated shadow로 다른 CTA와 일관.
+   - 입력 변경 시 `.spring(0.38/0.88)` 애니메이션으로 카드/CTA 라벨 전환.
+
+5. **자동 Xcode 동기화**
+   - 프로젝트가 PBXFileSystemSynchronizedRootGroup 사용 중 → 신규 `PresetSummaryView.swift`는 target membership 조작 없이 자동 포함됨.
+
+Build: ✅ BUILD SUCCEEDED (iPhone 17 Pro, iOS 26.4).
+
 ## Known Architectural State
 
 - Camera save flow → `SavePhotoUseCase` + `FilePhotoRepository` (JSON on disk).
@@ -216,10 +246,10 @@ Build: ✅ BUILD SUCCEEDED (iPhone 17 Pro, iOS 26.4).
 
 > **다음 세션 시작점**: 아래 1번부터 시작.
 
-1. **필터/컨셉 가시성** (backlog P1) — CameraConceptStepView에서 입력한 컨셉이 프리셋 추천에 반영되는 흐름을 시각적으로 더 명확히.
-2. **Capture result feedback 강화** (backlog P1) — 저장 완료 토스트 이상의 확신을 줄 수 있는 후반 플로우 디자인.
+1. **Capture result feedback 강화** (backlog P1) — 저장 완료 토스트 이상의 확신을 줄 수 있는 후반 플로우 디자인.
+2. **Accessibility identifiers** (backlog P1) — XcodeBuildMCP 자동화를 위한 안정적인 식별자 추가.
 3. **Live guidance 실기기 튜닝** — 안정화 파라미터(0.9s stability / 1.6s min display)가 체감상 적절한지, 배너 위치가 캡처 버튼과 겹치지 않는지 확인.
-4. **레퍼런스 분석 시간 체감 튜닝** — 1.8초가 적절한지, 단계 문구가 의미 있는지 실기기 확인.
+4. **레퍼런스 분석 / 컨셉 프리뷰 체감 튜닝** — 1.8초 스테이지/스프링 애니메이션이 적절한지, 제안 키워드 셋이 실제 사용 동작과 맞는지 실기기 확인.
 5. **Runtime validation** — camera → capture → save → force-quit → relaunch → map pin 확인 (수동 QA).
 
 ## Verification Status
@@ -236,6 +266,7 @@ Build: ✅ BUILD SUCCEEDED (iPhone 17 Pro, iOS 26.4).
 - **Live guidance UX: build-verified** (`BUILD SUCCEEDED`, iPhone 17 Pro Simulator, iOS 26.4) — 실기기 체감 튜닝은 다음 세션에서
 - **레퍼런스 온보딩 플로우: build-verified** (`BUILD SUCCEEDED`, iPhone 17 Pro Simulator, iOS 26.4) — 실기기 체감 튜닝은 다음 세션에서
 - **홈 화면 디자인 개선: build-verified** (`BUILD SUCCEEDED`, iPhone 17 Pro Simulator, iOS 26.4) — 실기기 확인은 다음 세션
+- **컨셉 프리셋 실시간 미리보기: build-verified** (`BUILD SUCCEEDED`, iPhone 17 Pro Simulator, iOS 26.4) — 실기기 확인 다음 세션
 - Branch state: main only
 - Last handoff: 2026-04-18
 

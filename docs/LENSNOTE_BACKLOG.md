@@ -35,9 +35,8 @@
 
 ### P1
 
-- [ ] Make concept input clearly influence filter recommendation or preset selection in a visible way.
-  Why: the app promise includes filter guidance, not just hidden internal state.
-  Owner: `lensnote-planner` -> `lensnote-designer` -> `lensnote-ios-engineer`
+- [x] Make concept input clearly influence filter recommendation or preset selection in a visible way.
+  Done: `FilterPreset.forConcept(_:)` 단일 룰 추출(야경/인물/풍경까지 확장), `PresetSummaryView` 공용 추출, CameraConceptStepView에 suggestion chips + 실시간 preset preview 카드 + "{preset.name}으로 시작" CTA 반영. (2026-04-18)
 
 - [ ] Improve capture result feedback after saving a photo.
   Why: users need confidence that the shot was saved and connected to the LensNote flow.
@@ -69,6 +68,6 @@
 2. ~~**전체 디자인 개선**~~ (~~맵~~ ✅ → ~~카메라~~ ✅ → ~~홈~~ ✅) ✅ Done (2026-04-18)
 3. ~~Finish camera flow and live guidance usability.~~ ✅ Done (2026-04-17)
 4. Strengthen map experience around the chosen data strategy.
-5. Expose filter recommendation more clearly. ← 현재 여기 (P1)
-6. Improve runtime testability with accessibility identifiers and simulator scenarios.
+5. ~~Expose filter recommendation more clearly.~~ ✅ Done (2026-04-18)
+6. Improve runtime testability with accessibility identifiers and simulator scenarios. ← 현재 여기
 7. Polish and demo preparation.
