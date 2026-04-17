@@ -27,9 +27,9 @@
   Note: 선택 화면 → 텍스트/레퍼런스/수동 → 라이브 뷰 전환은 구현됨. 레퍼런스 사진 분석 UX, 분석 중 상태 표시 등 세부 완성 필요.
   Owner: `lensnote-designer` → `lensnote-ios-engineer` → `lensnote-simulator-qa`
 
-- [ ] Stabilize the live guidance UX.
-  Why: composition feedback should be understandable and calm rather than noisy.
-  Owner: `lensnote-designer` → `lensnote-ios-engineer` → `lensnote-simulator-qa`
+- [x] Stabilize the live guidance UX.
+  Done: `activeGuidanceHint` 통합 퍼블리셔 + CoreML 힌트 안정화(0.9s stability / 1.6s min display) + Vision fallback + 캡처 바 위 글래스 배너 노출. (2026-04-17)
+  Note: 실기기 체감 튜닝은 다음 세션 필요.
 
 - [x] Make the map tab feel like a real product screen, including permission handling and empty states.
   Done: 서브뷰 테마 통일, PermissionOverlayView 격상, MapEmptyStateView 추가, 맵 스타일 정리, PinCardView source 뱃지. (2026-04-02)

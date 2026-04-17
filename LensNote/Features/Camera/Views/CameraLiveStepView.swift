@@ -24,6 +24,8 @@ struct CameraLiveStepView: View {
     var sceneLabel: String = "STANDARD"
     /// CoreML 종합 추론 점수 (0~1). guidanceScore와 함께 SCORE 칩에 표시된다.
     var inferenceScore: Double = 0.0
+    /// 화면에 실제로 노출할 구도 힌트 문구. nil이면 배너를 숨긴다.
+    var activeGuidanceHint: String? = nil
 
     let onBack: () -> Void
     let onToggleGrid: () -> Void
@@ -96,14 +98,51 @@ struct CameraLiveStepView: View {
             // MARK: - Side floating controls
             sideControls
 
-            // MARK: - Bottom capture controls
-            VStack(spacing: 0) {
+            // MARK: - Bottom capture controls + guidance banner
+            VStack(spacing: LensNoteTheme.Spacing.xs) {
                 Spacer()
+                if let activeGuidanceHint {
+                    guidanceBanner(activeGuidanceHint)
+                        .transition(.asymmetric(
+                            insertion: .opacity.combined(with: .offset(y: 8)),
+                            removal: .opacity
+                        ))
+                }
                 bottomCaptureBar
                     .padding(.horizontal, LensNoteTheme.Spacing.xl)
                     .padding(.bottom, LensNoteTheme.Spacing.md)
             }
+            .animation(.spring(response: 0.38, dampingFraction: 0.88), value: activeGuidanceHint)
         }
+    }
+
+    // MARK: - Guidance Banner
+
+    private func guidanceBanner(_ text: String) -> some View {
+        HStack(spacing: LensNoteTheme.Spacing.xxs) {
+            Image(systemName: "sparkles")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(LensNoteTheme.Colors.accentCyan)
+            Text(text)
+                .font(LensNoteTheme.Typography.bodyStrong)
+                .foregroundStyle(LensNoteTheme.Colors.textPrimary)
+                .lineLimit(2)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.horizontal, LensNoteTheme.Spacing.sm)
+        .padding(.vertical, LensNoteTheme.Spacing.xs)
+        .background(LensNoteTheme.Colors.surface.opacity(0.55))
+        .background(.ultraThinMaterial)
+        .clipShape(Capsule())
+        .overlay(
+            Capsule()
+                .strokeBorder(LensNoteTheme.Colors.chipBorder, lineWidth: 1)
+        )
+        .shadow(color: LensNoteTheme.Shadow.elevated, radius: 16, y: 6)
+        .padding(.horizontal, LensNoteTheme.Spacing.xl)
+        .accessibilityLabel("구도 안내")
+        .accessibilityValue(text)
     }
 
     // MARK: - Top Bar
@@ -545,19 +584,22 @@ private struct CameraLiveStepPreviewWrapper: View {
     let overlayState: GuidanceOverlayState?
     let recommendation: CameraRecommendation
     let tips: [String]
+    let activeGuidanceHint: String?
 
     init(
         showGrid: Bool,
         cameraStatusMessage: String?,
         overlayState: GuidanceOverlayState?,
         recommendation: CameraRecommendation,
-        tips: [String]
+        tips: [String],
+        activeGuidanceHint: String? = nil
     ) {
         _showGrid = State(initialValue: showGrid)
         self.cameraStatusMessage = cameraStatusMessage
         self.overlayState = overlayState
         self.recommendation = recommendation
         self.tips = tips
+        self.activeGuidanceHint = activeGuidanceHint
     }
 
     var body: some View {
@@ -573,6 +615,7 @@ private struct CameraLiveStepPreviewWrapper: View {
             isCapturingPhoto: false,
             recommendation: recommendation,
             tips: tips,
+            activeGuidanceHint: activeGuidanceHint,
             onBack: {},
             onToggleGrid: { showGrid.toggle() },
             onCapture: {}
@@ -622,6 +665,7 @@ private struct CameraLiveStepPreviewWrapper: View {
             aperture: "f/2.8",
             whiteBalance: "AWB"
         ),
-        tips: ["조금 더 왼쪽으로", "배경 요소를 단순화"]
+        tips: ["조금 더 왼쪽으로", "배경 요소를 단순화"],
+        activeGuidanceHint: "피사체를 왼쪽으로 이동해보세요."
     )
 }

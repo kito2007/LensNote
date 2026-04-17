@@ -14,6 +14,7 @@ The project has:
 - **맵 탭 디자인 1차 개선 완료** (2026-04-02)
 - **카메라 디자인 전면 개선 완료** (2026-04-05)
 - **CoreML 실시간 AI 파이프라인 구현 완료** (2026-04-06)
+- **Live guidance UX 안정화 — 배너 노출 + 힌트 디바운스** (2026-04-17)
 
 ## Current High-Level Goal
 
@@ -118,6 +119,29 @@ CoreML 실시간 AI 추론 파이프라인 구현:
 7. **CameraView.swift** 수정
    - CameraLiveStepView 호출부에 `sceneLabel:`, `inferenceScore:` 전달 추가
 
+## Completed Work (2026-04-17)
+
+Live guidance UX 안정화 — CoreML/Vision 힌트를 화면에 노출:
+
+1. **CameraViewModel.swift**
+   - `@Published private(set) var activeGuidanceHint: String?` 추가 — UI에 실제 노출되는 최종 힌트.
+   - CoreML 힌트 안정화 상태: `pendingCoreMLHint`, `pendingCoreMLHintSince`, `activeHintAppliedAt`.
+   - 파라미터: `coreMLHintStabilityThreshold = 0.9s` (동일 힌트 ≥ 2프레임 지속), `coreMLHintMinDisplayDuration = 1.6s` (숨길 때 최소 표시 시간).
+   - `updateActiveGuidanceHint()` 메서드 추가 — 우선순위: CoreML 힌트(디바운스 통과) → Vision `guidanceMessage`(CoreML 미활성 시 fallback).
+   - `applyInferenceOutput`과 `applyGuidanceResult`(defer)에서 호출.
+   - 초기 placeholder 메시지(`"컨셉을 입력하면 구도 안내를 시작해요."`)와 권한 에러 메시지는 필터링.
+
+2. **CameraLiveStepView.swift**
+   - `activeGuidanceHint: String?` 프로퍼티 추가.
+   - 하단 캡처 바 위 `guidanceBanner(_:)` 배너 추가: sparkles 아이콘(accentCyan), 텍스트(bodyStrong), ultraThinMaterial capsule, chipBorder stroke.
+   - `.spring(response: 0.38, dampingFraction: 0.88)` 애니메이션으로 asymmetric transition (insertion: opacity + offset, removal: opacity).
+   - Preview "Guided"에 샘플 힌트 추가.
+
+3. **CameraView.swift**
+   - `activeGuidanceHint: viewModel.activeGuidanceHint` 전달.
+
+Build: ✅ BUILD SUCCEEDED (iPhone 17 Pro, iOS 26.4).
+
 ## Known Architectural State
 
 - Camera save flow → `SavePhotoUseCase` + `FilePhotoRepository` (JSON on disk).
@@ -141,7 +165,7 @@ CoreML 실시간 AI 추론 파이프라인 구현:
 
 > **다음 세션 시작점**: 아래 1번부터 시작.
 
-1. **Live guidance UX 안정화** (backlog P0) — coreMLGuidanceHint를 UI에 노출, 메시지 안정성 튜닝.
+1. **Live guidance 실기기 튜닝** — 안정화 파라미터(0.9s stability / 1.6s min display)가 체감상 적절한지, 배너 위치가 캡처 버튼과 겹치지 않는지 확인.
 2. **카메라 온보딩 플로우 완성** (backlog P0) — 레퍼런스 사진 플로우, 분석 중 UX 등.
 3. **홈 화면 디자인 통일** — dark cinematic + cyan accent 언어 통일 (backlog 전체 디자인 개선 마지막 파트).
 4. **필터/컨셉 가시성** (backlog P1).
@@ -158,8 +182,9 @@ CoreML 실시간 AI 추론 파이프라인 구현:
 - 카메라 하드코딩 색상 제거 확인: `Color.black`, `.white.opacity` → grep 0건
 - **CoreML AI 파이프라인: 실기기 검증 완료** — FILTER 칩 장면 분류 동적 변경 확인됨
 - 모델 파일 번들 포함: Xcode 타겟 멤버 추가 완료
+- **Live guidance UX: build-verified** (`BUILD SUCCEEDED`, iPhone 17 Pro Simulator, iOS 26.4) — 실기기 체감 튜닝은 다음 세션에서
 - Branch state: main only
-- Last handoff: 2026-04-06
+- Last handoff: 2026-04-17
 
 ## Update Rule
 

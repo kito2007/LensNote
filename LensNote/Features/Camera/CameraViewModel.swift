@@ -51,8 +51,11 @@ final class CameraViewModel: NSObject, ObservableObject {
     @Published var inferenceScore: Double = 0.0
     /// AI가 감지한 피사체 바운딩 박스 (정규화 좌표 0~1).
     @Published var coreMLSubjectBox: CGRect? = nil
-    /// AI 기반 구도 힌트 문구.
+    /// AI 기반 구도 힌트 문구 (원본, 디바운스 전).
     @Published var coreMLGuidanceHint: String? = nil
+    /// UI에 실제로 노출되는 최종 구도 힌트. CoreML 힌트(디바운스 통과) > Vision guidanceMessage 순으로 선택.
+    /// 힌트가 없으면 nil — UI에서 배너를 숨긴다.
+    @Published private(set) var activeGuidanceHint: String? = nil
 
     let session = AVCaptureSession()
 
@@ -82,6 +85,15 @@ final class CameraViewModel: NSObject, ObservableObject {
     private let guidanceDebounceInterval: TimeInterval = 0.5
     private let repeatedGuidanceCooldown: TimeInterval = 1.4
     private let minimumGuidanceConfidence: Double = 0.42
+
+    // CoreML 힌트 안정화 상태
+    private var pendingCoreMLHint: String? = nil
+    private var pendingCoreMLHintSince = Date.distantPast
+    private var activeHintAppliedAt = Date.distantPast
+    /// 같은 CoreML 힌트가 이 시간 이상 지속되어야 UI에 노출한다 (0.5초 추론 간격 기준 ≈ 2프레임).
+    private let coreMLHintStabilityThreshold: TimeInterval = 0.9
+    /// 한 번 표시된 힌트는 이 시간 동안은 숨기지 않는다 — 깜빡임 방지.
+    private let coreMLHintMinDisplayDuration: TimeInterval = 1.6
 
     init(
         savePhotoUseCase: SavePhotoUseCase,
@@ -360,9 +372,56 @@ private extension CameraViewModel {
         inferenceScore = output.inferenceScore
         coreMLSubjectBox = output.subjectBoundingBox
         coreMLGuidanceHint = output.guidanceHint
+        updateActiveGuidanceHint()
+    }
+
+    /// CoreML 힌트(디바운스 통과)를 우선 사용하고, CoreML이 활성화되지 않은 경우에만 Vision 메시지로 폴백한다.
+    /// 한 번 표시된 힌트는 최소 표시 시간 동안은 숨기지 않아 깜빡임을 방지한다.
+    @MainActor
+    func updateActiveGuidanceHint() {
+        let now = Date()
+        var candidate: String? = nil
+
+        // 1. CoreML 힌트 안정화
+        if let hint = coreMLGuidanceHint {
+            if pendingCoreMLHint == hint {
+                if now.timeIntervalSince(pendingCoreMLHintSince) >= coreMLHintStabilityThreshold {
+                    candidate = hint
+                }
+            } else {
+                pendingCoreMLHint = hint
+                pendingCoreMLHintSince = now
+            }
+        } else {
+            pendingCoreMLHint = nil
+            // CoreML이 한 번도 실행되지 않았을 때만 Vision guidanceMessage로 폴백한다.
+            if inferenceScore == 0, !readyToCapture {
+                let vision = guidanceMessage.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !vision.isEmpty,
+                   vision != "컨셉을 입력하면 구도 안내를 시작해요.",
+                   vision != "카메라 권한이 필요해요." {
+                    candidate = vision
+                }
+            }
+        }
+
+        // 2. 동일하면 업데이트 불필요
+        guard activeGuidanceHint != candidate else { return }
+
+        // 3. 힌트를 숨길 때는 최소 표시 시간을 지켜 깜빡임 방지
+        if activeGuidanceHint != nil,
+           candidate == nil,
+           now.timeIntervalSince(activeHintAppliedAt) < coreMLHintMinDisplayDuration {
+            return
+        }
+
+        activeGuidanceHint = candidate
+        activeHintAppliedAt = now
     }
 
     func applyGuidanceResult(_ result: CompositionGuidanceResult) -> Bool {
+        // 어떤 경로로 빠져나가든 최종 UI 힌트는 최신 상태로 재계산한다.
+        defer { updateActiveGuidanceHint() }
         // 메시지를 UI에 반영하기 전에 점수/촬영 가능 상태는 즉시 업데이트한다.
         guidanceScore = result.evaluation.overallScore
         readyToCapture = result.evaluation.isAcceptable
