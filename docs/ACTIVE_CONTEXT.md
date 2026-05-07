@@ -17,6 +17,7 @@ The project has:
 - **Live guidance UX 안정화 — 배너 노출 + 힌트 디바운스** (2026-04-17)
 - **홈 화면 디자인 통일 — Quick Shot 수직 재배치 + Map Gallery preview + Recent Sessions 썸네일** (2026-04-18)
 - **컨셉 입력 실시간 프리셋 미리보기 — PresetSummaryView 공용 추출 + suggestion chips + CTA 반영** (2026-04-18)
+- **MapViewModel 서비스 분리 — GeocodingService + PhotoLibraryService 추출** (2026-04-18)
 
 ## Current High-Level Goal
 
@@ -267,6 +268,7 @@ Build: ✅ BUILD SUCCEEDED (iPhone 17 Pro, iOS 26.4).
 - **레퍼런스 온보딩 플로우: build-verified** (`BUILD SUCCEEDED`, iPhone 17 Pro Simulator, iOS 26.4) — 실기기 체감 튜닝은 다음 세션에서
 - **홈 화면 디자인 개선: build-verified** (`BUILD SUCCEEDED`, iPhone 17 Pro Simulator, iOS 26.4) — 실기기 확인은 다음 세션
 - **컨셉 프리셋 실시간 미리보기: build-verified** (`BUILD SUCCEEDED`, iPhone 17 Pro Simulator, iOS 26.4) — 실기기 확인 다음 세션
+- **MapViewModel 서비스 분리: build-verified** (`BUILD SUCCEEDED`, iPhone 17 Pro Simulator, iOS 26.4)
 - Branch state: main only
 - Last handoff: 2026-04-18
 
