@@ -14,12 +14,21 @@ struct RootView: View {
     let container: DIContainer
     @StateObject private var mapVM: MapViewModel
     @State private var selectedTab: AppTab = .home
-    @State private var isCameraLive: Bool = false
+    /// 카메라 탭의 현재 sub-step이 dock을 숨겨야 하는 상태일 때 true.
+    /// selection 진입점은 dock 유지, concept/manual/reference/live/result는 숨김.
+    @State private var cameraHidesDock: Bool = false
 
     init(cameraVM: CameraViewModel, container: DIContainer) {
         self.cameraVM = cameraVM
         self.container = container
         _mapVM = StateObject(wrappedValue: container.makeMapViewModel())
+    }
+
+    /// dock을 숨겨야 하면 true.
+    /// - 카메라 탭이 활성이고 selection 이외의 sub-step(concept/manual/reference/live/result)일 때만 true.
+    /// - 다른 탭(Home/Map/Profile)이 활성일 때는 항상 false(dock 표시).
+    private var shouldHideDock: Bool {
+        selectedTab == .camera && cameraHidesDock
     }
 
     var body: some View {
@@ -33,7 +42,7 @@ struct RootView: View {
                 )
                 .tag(AppTab.home)
 
-                CameraView(viewModel: cameraVM, isLiveCamera: $isCameraLive)
+                CameraView(viewModel: cameraVM, hidesFloatingDock: $cameraHidesDock)
                     .tag(AppTab.camera)
 
                 MapView(viewModel: mapVM, onCameraTabTap: {
@@ -47,9 +56,20 @@ struct RootView: View {
                     .tag(AppTab.profile)
             }
             .ignoresSafeArea(edges: .bottom)
+            // FloatingDockBar는 ZStack overlay로 그려지므로 system safe area에 반영되지 않는다.
+            // dock이 보이는 상태에서는 dockTotalClearance 만큼 하단 inset을 추가해
+            // 자식 뷰의 CTA 등이 dock 뒤에 가려지지 않도록 한다.
+            // 카메라 탭에서 selection 이외의 sub-step(cameraHidesDock = true)이거나
+            // 다른 탭이 아닌 상태에서도 hideDock이 true면 inset 제거.
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                if !shouldHideDock {
+                    Color.clear
+                        .frame(height: LensNoteTheme.Spacing.dockTotalClearance)
+                }
+            }
 
-            // 플로팅 dock 오버레이 — 카메라 라이브 뷰에서는 숨김
-            if !isCameraLive {
+            // 플로팅 dock 오버레이 — dock 숨김 조건과 동기화
+            if !shouldHideDock {
                 FloatingDockBar(selectedTab: $selectedTab)
                     .padding(.horizontal, LensNoteTheme.Spacing.lg)
                     .padding(.bottom, LensNoteTheme.Spacing.lg)

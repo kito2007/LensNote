@@ -76,7 +76,8 @@ struct CameraSelectionStepView: View {
         }
         .padding(LensNoteTheme.Spacing.sm)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(LensNoteTheme.Gradients.cameraBackground)
+        // 배경은 Dynamic Island 뒤까지 채우고, 콘텐츠는 safe area 안에서 시작 (결함 1)
+        .background(LensNoteTheme.Gradients.cameraBackground, ignoresSafeAreaEdges: .all)
     }
 
     private func modeButton(

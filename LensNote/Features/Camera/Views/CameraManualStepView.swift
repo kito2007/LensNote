@@ -41,7 +41,8 @@ struct CameraManualStepView: View {
         }
         .padding(LensNoteTheme.Spacing.sm)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(LensNoteTheme.Colors.surface)
+        // 배경은 Dynamic Island 뒤까지 채우고, 콘텐츠는 safe area 안에서 시작 (결함 1)
+        .background(LensNoteTheme.Colors.surface, ignoresSafeAreaEdges: .all)
     }
 
     private func manualSlider(title: String, value: Binding<Double>, range: ClosedRange<Double> = -1...1) -> some View {
