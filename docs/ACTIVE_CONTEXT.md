@@ -18,6 +18,12 @@ The project has:
 - **홈 화면 디자인 통일 — Quick Shot 수직 재배치 + Map Gallery preview + Recent Sessions 썸네일** (2026-04-18)
 - **컨셉 입력 실시간 프리셋 미리보기 — PresetSummaryView 공용 추출 + suggestion chips + CTA 반영** (2026-04-18)
 - **MapViewModel 서비스 분리 — GeocodingService + PhotoLibraryService 추출** (2026-04-18)
+- **UX 결함 3건 + ShotStyle 룰셋 확장 완료** (2026-05-09)
+- **ShotRecipe 풀 분석 — EXIF + Vision face geometry + DeepLabV3 person mask로 촬영 동작 역추출 + 자동 ShotStyle 라벨링(항공샷/거울샷/발끝샷/뒷모습)** (2026-05-09)
+- **CameraReferenceStepView UX 결함 3건 수정 — Dynamic Island 헤더 충돌 / 분석 라벨 "중" 잔류 / CTA sticky 처리** (2026-05-09)
+- **FloatingDockBar 가시성 — 카메라 sub-step 단위 제어 (selection만 dock 유지, 나머지 숨김)** (2026-05-09)
+- **wideSelfie 신설 + cameraAngle fallback 보완 — 광각 셀피(coverage 10~40% 영역) 자동 라벨링** (2026-05-09)
+- **ShotStyle 룰셋 미세 튜닝 + 한국어 조사 helper — 39장 CLI 일괄 검증 기반** (2026-05-09)
 
 ## Current High-Level Goal
 
@@ -224,6 +230,44 @@ Build: ✅ BUILD SUCCEEDED (iPhone 17 Pro, iOS 26.4).
 
 Build: ✅ BUILD SUCCEEDED (iPhone 17 Pro, iOS 26.4).
 
+## Completed Work (2026-05-09 — ShotRecipe 풀 분석)
+
+레퍼런스 사진에서 **촬영 동작을 역추출**하는 새로운 분석 레이어. 톤/필터에 더해 "어떻게 자세를 잡고 어떤 렌즈로 찍었는가"까지 보여주는 게 목표. MZ 트렌드(항공샷·거울샷·발끝샷·뒷모습) 페르소나 검증을 위한 기능.
+
+1. **`Domain/Entities/ShotRecipe.swift` 신규**
+   - `ShotRecipe` struct: focalLength35mm/aperture/iso/shutterSpeed (EXIF), subjectCoverage/subjectVerticalPosition/subjectBoundingBox (Vision/DeepLab), faceYaw/facePitch/cameraAngle/gazeDirection (얼굴 geometry), horizonTilt, detectedStyle, styleConfidence.
+   - enums: `VerticalPosition`, `CameraAngle` (highAngle/eyeLevel/lowAngle), `GazeDirection` (toCamera/awayFromCamera/unknown), `ShotStyle` (aerialSelfie/mirrorSelfie/footShot/backView/unknown), `ShotStyleConfidence` (high/medium/low).
+   - `CodableRect` 래퍼(CGRect Codable 미지원 대응). Codable + Equatable 채택.
+
+2. **`Features/Camera/ShotRecipeAnalyzer.swift` 신규** (12.9KB)
+   - `analyze(imageData: Data) async -> ShotRecipe` 단일 공개 API. nonisolated.
+   - 단계 A: ImageIO로 EXIF 파싱 (FocalLenIn35mmFilm/FNumber/ISOSpeedRatings/ExposureTime).
+   - 단계 B: VNDetectHumanRectanglesRequest revision 2로 인물 박스 + Vision bottom-left → top-left 좌표 변환.
+   - 단계 C: VNDetectFaceLandmarksRequest로 yaw/pitch → cameraAngle (pitch>0.3=low, <-0.2=high) + gazeDirection (|yaw|<0.25=toCamera).
+   - 단계 D: 기존 `DeepLabV3Service` 재사용. Data → CGImage → CVPixelBuffer 변환 헬퍼 내장. dominantClass==15(person) 시 정밀 coverage.
+   - 단계 E: 라벨링 룰 (우선순위) — aerialSelfie / mirrorSelfie / footShot / backView / unknown. 얼굴 미검출 시 bbox midY 0.35/0.65로 cameraAngle fallback.
+
+3. **`Features/Camera/Views/ShotRecipeView.swift` 신규** (17.7KB)
+   - `PresetSummaryView`와 형제 카드. cardOverlay + chipBorder + cardLarge radius.
+   - 구조: 헤더(SHOT RECIPE + confidence dots) → 스타일 칩(SF Symbol + 한국어 부연) → cameraAngle/gazeDirection 행 → subjectCoverage 단방향 progress 바(accentCyan) → 메타데이터 단일 행(focal · f/X · ISO · shutter · horizon).
+   - ShotStyle별 색상: aerialSelfie=accentCyan, mirrorSelfie=primary, footShot=tertiary, backView=warning, unknown=textTertiary.
+   - Confidence dots: high=success(green), medium=accentCyan, low=textTertiary.
+   - nil 필드 자동 숨김. 모든 필드 nil + unknown이면 "분석 결과 없음" 안내.
+   - Preview 4종 (각 ShotStyle별 + 빈 케이스).
+
+4. **`Features/Camera/Views/CameraReferenceStepView.swift` 통합**
+   - `ReferenceAnalysisStage`에 `case extractingShot` 추가 (4번째 단계).
+   - `generatedRecipe: ShotRecipe?` 프로퍼티 추가, `PresetSummaryView` 아래 Divider + `ShotRecipeView` 노출.
+   - `confirmButtonLabel` 계산 프로퍼티: detectedStyle ≠ .unknown이면 "이 톤 + {스타일}으로 촬영 시작", unknown이면 기존 문구. CTA 라벨 .animation으로 부드럽게 전환.
+
+5. **`Features/Camera/CameraView.swift` 통합**
+   - `@State referenceImageData: Data?` 추가 — picker raw Data 보관(EXIF 보존, 이미 `loadTransferable(type: Data.self)`로 받고 있음).
+   - `@State referenceGeneratedRecipe: ShotRecipe?` 추가.
+   - `analyzeReferencePhotoAndMove(image:)` → `(image:data:)`로 변경. 4단계 흐름: tone(650ms) → color(650ms) → preset(500ms) → extractingShot 단계에서 `Task.detached(priority: .userInitiated)` 내에서 `ShotRecipeAnalyzer().analyze(imageData:)` 호출 → `await MainActor.run`으로 결과 세팅 → completed.
+   - `resetReferenceFlow()`에서 `referenceImageData`, `referenceGeneratedRecipe` nil 초기화.
+
+Build: ✅ BUILD SUCCEEDED (iPhone 17 Pro Simulator, iOS 26.4.1).
+
 ## Known Architectural State
 
 - Camera save flow → `SavePhotoUseCase` + `FilePhotoRepository` (JSON on disk).
@@ -242,16 +286,113 @@ Build: ✅ BUILD SUCCEEDED (iPhone 17 Pro, iOS 26.4).
 - 카메라 사이드 버튼 액션 미연결 (map/photo library).
 - 모델 파일이 번들에 없으면 `classify`/`segment` 모두 nil을 반환하고 기존 Vision 가이드로 graceful fallback된다 (크래시 없음).
 - DeepLabV3 MLMultiArray 형상(shape)이 모델 버전에 따라 다를 수 있음. 현재 [513, 513] 가정. 실기기에서 동작 확인됨.
+- 시뮬레이터에서 `VNDetectFaceLandmarksRequest`의 yaw/pitch가 nil로 나올 수 있음 — 이 경우 ShotRecipeAnalyzer가 사람 박스 위치 기반 cameraAngle 추정으로 fallback. 실기기 검증 필요.
+- `horizonTilt`는 항상 nil (Vision에 수평선 감지 API 없음). 별도 모델 또는 CoreMotion 기반 확장 여지.
+- 레퍼런스 분석 중 사용자가 뒤로가기 하면 `Task` 내부의 ShotRecipeAnalyzer가 취소되지 않고 끝까지 실행됨 — UI에는 반영 안 됨(`referenceAnalysisStage`가 .idle로 리셋된 상태). 불필요한 CPU 사용 정도. 취소 패턴 도입은 별도 작업.
+
+## Completed Work (2026-05-09 — UX fixes + ShotStyle expansion)
+
+실기기 UX 결함 3건 수정 + ShotStyle 룰셋 확장:
+
+1. **레퍼런스 사진 미리보기 짤림 수정 (CameraReferenceStepView.swift)**
+   - `scaledToFill() + .frame(height: 200) + .clipped()` → `scaledToFit() + .frame(maxHeight: 300)`.
+   - 세로 인물 사진 머리/하체 짤림 해소. background(cardOverlay)로 letterbox 영역 처리.
+
+2. **CTA FloatingDockBar 가림 해소 (RootView.swift + CameraReferenceStepView.swift)**
+   - 옵션 1 채택: RootView TabView에 `.safeAreaInset(edge: .bottom, spacing: 0)` 추가.
+   - `isCameraLive == false`일 때만 `dockTotalClearance(116pt)` 투명 spacer 삽입.
+   - 모든 탭의 `safeAreaInset` CTA 자동 보호. 카메라 라이브 뷰 시 불필요 인셋 없음.
+   - CameraReferenceStepView CTA에 `.padding(.bottom, xs + dockTotalClearance)` 추가 명시 유지.
+
+3. **unknown 안내 문구 수정 (ShotRecipeView.swift)**
+   - "분석 중 — 더 선명한 레퍼런스를 골라보세요" → "스타일 미확정 — 더 선명한 레퍼런스를 골라보세요".
+
+4. **ShotStyle 신규 케이스 (ShotRecipe.swift)**: classicSelfie / landscape / closeUp 추가.
+
+5. **ShotRecipeAnalyzer 룰 갱신 (ShotRecipeAnalyzer.swift)**
+   - 8단계 우선순위: aerialSelfie → mirrorSelfie → classicSelfie → footShot → backView → closeUp → landscape → unknown.
+   - classicSelfie: gaze==.toCamera && angle==.eyeLevel && coverage >= 0.40.
+   - closeUp: coverage >= 0.65 (위 규칙 미해당). confidence .medium 고정.
+   - landscape: coverage == nil || < 0.05. EXIF focalLength 있으면 .high.
+
+6. **ShotRecipeView 신규 케이스 매핑 + 색상 충돌 조정 (ShotRecipeView.swift)**
+   - classicSelfie: primary(Blue) / mirrorSelfie: warning(Gold) / backView: danger(Red) — 기존 mirrorSelfie=primary 변경으로 충돌 해소.
+   - landscape: success(Green) / closeUp: tertiary(Violet).
+
+7. **confirmButtonLabel 신규 케이스 (CameraReferenceStepView.swift)**: classicSelfie="셀피", landscape="풍경샷", closeUp="근접샷".
+
+Build: ✅ BUILD SUCCEEDED (iPhone 17 Pro Simulator, iOS 26.4.1)
+
+## Completed Work (2026-05-09 — dock visibility per sub-step)
+
+카메라 sub-step 단위 FloatingDockBar 가시성 제어:
+
+1. **`CameraView.swift`**
+   - `isLiveCamera: Binding<Bool>` → `hidesFloatingDock: Binding<Bool>` 이름 변경 (의미 명확화).
+   - `onChange(of: step)`: `isLiveCamera = (newStep == .camera)` → `hidesFloatingDock = (newStep != .select)`.
+   - selection 진입점에서는 dock 유지, concept/manual/reference/live/result 모든 sub-step에서 dock 숨김.
+
+2. **`RootView.swift`**
+   - `@State isCameraLive` → `@State cameraHidesDock`.
+   - `shouldHideDock: Bool` computed property 추가: `selectedTab == .camera && cameraHidesDock`.
+   - `safeAreaInset` 조건 + dock 오버레이 조건 모두 `shouldHideDock`으로 통일.
+   - 다른 탭(Home/Map/Profile)이 활성이면 `shouldHideDock`이 항상 false → dock 정상 표시 보장.
+
+3. **`CameraReferenceStepView.swift`**
+   - CTA `.safeAreaInset` padding: `.padding(.bottom, xs + dockTotalClearance)` → `.padding(.bottom, xs)`.
+   - dock이 숨겨진 상태이므로 116pt 잉여 패딩 제거. 시스템 `.bottom` safeAreaInset이 home indicator 처리.
+
+Build: ✅ BUILD SUCCEEDED (iPhone 17 Pro Simulator, iOS 26.4.1).
+
+## Completed Work (2026-05-09 — wideSelfie + cameraAngle fallback)
+
+실기기 테스트에서 정면 셀피(coverage 22%, focal 24mm)가 unknown으로 떨어진 사각지대 발견. 한국 MZ "와이드 셀피" 트렌드 — 광각으로 본인+배경을 함께 담는 구도.
+
+1. **`ShotStyle` enum에 `wideSelfie` 추가** (ShotRecipe.swift)
+2. **`estimateCameraAngle` fallback 보완** (ShotRecipeAnalyzer.swift): midY 0.35~0.65 → `nil` 대신 `.eyeLevel`. face pitch가 nil인 경우(시뮬레이터/일부 실기기)에도 cameraAngle이 결정되도록.
+3. **wideSelfie 룰** (단계 E 우선순위 3번, classicSelfie 앞): `gaze == .toCamera && cameraAngle ∈ [eyeLevel, highAngle] && 0.10 ≤ coverage < 0.40 && (focal == nil || focal ≤ 28)`. classicSelfie의 0.40 상한과 깔끔한 boundary.
+4. **`Colors.primaryLight` 신규 토큰** (LensNoteTheme.swift): `Color(red: 0.392, green: 0.710, blue: 0.965)` — primary 계열이지만 한 단계 밝아 "넓고 개방적" 느낌. wideSelfie 칩 색상.
+5. **ShotRecipeView 매핑**: "WIDE SELFIE" 칩, `figure.arms.open` 심볼, "광각 셀피 — 본인 + 배경" 부연. Preview 1종 추가.
+6. **CameraReferenceStepView**: confirmButtonLabel switch에 wideSelfie 케이스 추가.
+
+Build: ✅ BUILD SUCCEEDED (iPhone 17 Pro Simulator, iOS 26.4.1).
+
+## Completed Work (2026-05-09 — 룰셋 미세 튜닝 + 한국어 조사)
+
+39장 KakaoTalk 사진을 swift CLI 스크립트로 일괄 분석한 결과 31/39(79%) 정상 라벨링, 8장 unknown. 4가지 패턴별 임계값 fix:
+
+1. **wideSelfie focal 조건 완화** (ShotRecipeAnalyzer.swift): `focal ≤ 28` → `focal ≤ 50`. 표준/망원 화각(35mm·50mm) 셀피도 wideSelfie로 잡힘. cameraAngle 조건도 `eyeLevel || highAngle` → `nil이 아닌 모든 각도`로 확장 (lowAngle 셀피 케이스). Confidence는 focal ≤ 28 → high, > 28 → medium, nil → low로 차등.
+
+2. **landscape 임계값 완화**: `coverage < 0.05` → `coverage < 0.10`. 사람 7~9% 작게 들어간 여행 풍경/배경 사진까지 풍경으로 라벨링.
+
+3. **mirrorSelfie 임계값 완화**: `coverage ≥ 0.35` → `coverage ≥ 0.15`. 멀리서 거울로 본인 찍는 와이드 거울샷 잡힘. `gaze=awayFromCamera + eyeLevel` 조합 자체가 강한 시그널이라 false positive 적음.
+
+4. **한국어 조사 helper 신설** (CameraReferenceStepView.swift):
+   ```swift
+   private func josa(after word: String) -> String {
+       guard let last = word.unicodeScalars.last,
+             last.value >= 0xAC00 && last.value <= 0xD7A3 else { return "으로" }
+       return ((last.value - 0xAC00) % 28 != 0) ? "으로" : "로"
+   }
+   ```
+   유니코드 한글 음절 종성 비트 판별. "와이드 셀피으로/정면 셀피으로/풍경으로" → "와이드 셀피로/정면 셀피로/풍경으로"로 자연스러워짐.
+
+5. **ShotRecipeView koreanDescription 통일**: "광각 셀피" → "와이드 셀피"로 confirmButtonLabel과 일치.
+
+검증: 39장 CLI 시뮬레이션 결과 8장 unknown이 모두 의미 있는 라벨로 분류됨 — wideSelfie 3장(#15, #23, #32), landscape 6장(#3, #4, #10, #11, #13, #30), mirrorSelfie 1장(#31).
+
+Build: ✅ BUILD SUCCEEDED (iPhone 17 Pro Simulator, iOS 26.4.1).
 
 ## Next Recommended Tasks (in priority order)
 
 > **다음 세션 시작점**: 아래 1번부터 시작.
 
-1. **Capture result feedback 강화** (backlog P1) — 저장 완료 토스트 이상의 확신을 줄 수 있는 후반 플로우 디자인.
-2. **Accessibility identifiers** (backlog P1) — XcodeBuildMCP 자동화를 위한 안정적인 식별자 추가.
-3. **Live guidance 실기기 튜닝** — 안정화 파라미터(0.9s stability / 1.6s min display)가 체감상 적절한지, 배너 위치가 캡처 버튼과 겹치지 않는지 확인.
-4. **레퍼런스 분석 / 컨셉 프리뷰 체감 튜닝** — 1.8초 스테이지/스프링 애니메이션이 적절한지, 제안 키워드 셋이 실제 사용 동작과 맞는지 실기기 확인.
+1. **라이브 코칭 (후속)** — 레퍼런스 ShotRecipe ↔ 라이브 프레임 ShotRecipe 비교해서 델타 코칭("팔 더 뻗으세요" 류). 이미 추출되는 ShotRecipe를 라이브 프레임에서도 추출해 비교.
+2. **Vision LLM 자문 (그 다음 후속)** — 레퍼런스 이미지를 멀티모달 모델에 넘겨 자연어 코칭. 네트워크 의존.
+3. **Capture result feedback 강화** (backlog P1) — 저장 완료 토스트 이상의 후반 플로우 디자인.
+4. **Accessibility identifiers** (backlog P1) — XcodeBuildMCP 자동화를 위한 안정적인 식별자 추가.
 5. **Runtime validation** — camera → capture → save → force-quit → relaunch → map pin 확인 (수동 QA).
+6. **face landmarks pitch 시뮬레이터 한계 모니터링** — 실기기에서는 pitch 잡힐 가능성. 시뮬레이터 의존 시 cameraAngle midY fallback에만 기댐.
 
 ## Verification Status
 
@@ -269,8 +410,14 @@ Build: ✅ BUILD SUCCEEDED (iPhone 17 Pro, iOS 26.4).
 - **홈 화면 디자인 개선: build-verified** (`BUILD SUCCEEDED`, iPhone 17 Pro Simulator, iOS 26.4) — 실기기 확인은 다음 세션
 - **컨셉 프리셋 실시간 미리보기: build-verified** (`BUILD SUCCEEDED`, iPhone 17 Pro Simulator, iOS 26.4) — 실기기 확인 다음 세션
 - **MapViewModel 서비스 분리: build-verified** (`BUILD SUCCEEDED`, iPhone 17 Pro Simulator, iOS 26.4)
+- **ShotRecipe 풀 분석: build-verified** (`BUILD SUCCEEDED`, iPhone 17 Pro Simulator, iOS 26.4.1) — 사용자가 직접 시뮬레이터/실기기에서 4가지 스타일(항공샷·거울샷·발끝샷·뒷모습) 검증 예정
+- **CameraReferenceStepView UX 결함 3건: build-verified** (`BUILD SUCCEEDED`, iPhone 17 Pro Simulator, iOS 26.4.1) — 실기기 Dynamic Island 시각 검증은 다음 세션
+- **ShotStyle 확장 (classicSelfie/landscape/closeUp) + 룰셋 갱신: build-verified** (`BUILD SUCCEEDED`, iPhone 17 Pro Simulator, iOS 26.4.1) — classicSelfie/landscape 실기기 정확도 검증은 다음 세션
+- **FloatingDockBar sub-step 가시성 제어: build-verified** (`BUILD SUCCEEDED`, iPhone 17 Pro Simulator, iOS 26.4.1) — 실기기 tap-through 확인은 다음 세션
+- **wideSelfie + cameraAngle fallback: build-verified** (`BUILD SUCCEEDED`) — 실기기 정면/광각 셀피 → wideSelfie 라벨링 확인됨 (사용자 보고)
+- **룰셋 미세 튜닝 + 한국어 조사: build-verified** (`BUILD SUCCEEDED`) — 39장 swift CLI 일괄 검증으로 unknown 8장 모두 의미 있는 라벨로 분류 확인. 실기기 재검증은 다음 세션
 - Branch state: main only
-- Last handoff: 2026-04-18
+- Last handoff: 2026-05-09
 
 ## Update Rule
 
