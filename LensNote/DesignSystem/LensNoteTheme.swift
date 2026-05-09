@@ -20,6 +20,8 @@ enum LensNoteTheme {
         static let textTertiary = Color.white.opacity(0.68)
 
         static let primary = Color(red: 0.0, green: 0.478, blue: 1.0)          // #007AFF Apple System Blue
+        /// primary 보다 밝고 개방적인 sky-blue — wideSelfie 전용 (#64B5F6 계열)
+        static let primaryLight = Color(red: 0.392, green: 0.710, blue: 0.965) // #64B5F6
         static let tertiary = Color(red: 0.914, green: 0.702, blue: 1.0)       // #E9B3FF luminous violet
         static let accentCyan = Color(red: 0.39, green: 0.87, blue: 1.0)
 

@@ -32,8 +32,8 @@ struct CameraDesign {
 /// 입력(레퍼런스/텍스트/수동) -> 촬영 -> 결과 저장의 플로우를 하나의 상태 머신(step)으로 관리한다.
 struct CameraView: View {
     @StateObject private var viewModel: CameraViewModel
-    /// 라이브 카메라 단계일 때 true — RootView에서 FloatingDockBar 숨김에 사용.
-    @Binding var isLiveCamera: Bool
+    /// selection 진입점 이외의 카메라 sub-step에서 true — RootView FloatingDockBar 숨김에 사용.
+    @Binding var hidesFloatingDock: Bool
 
     @State private var step: CameraInputMode = .select
     @State private var conceptInput: String = ""
@@ -49,14 +49,16 @@ struct CameraView: View {
     
     @State private var referenceAnalysisStage: ReferenceAnalysisStage = .idle
     @State private var referenceGeneratedPreset: FilterPreset? = nil
+    @State private var referenceImageData: Data? = nil
+    @State private var referenceGeneratedRecipe: ShotRecipe? = nil
     @State private var showGrid: Bool = true
     @State private var showSaveSuccess: Bool = false
     
     private let assistService: CameraAssistServiceProtocol = CoreMLCameraAssistService()
     
-    init(viewModel: CameraViewModel, isLiveCamera: Binding<Bool> = .constant(false)) {
+    init(viewModel: CameraViewModel, hidesFloatingDock: Binding<Bool> = .constant(false)) {
         _viewModel = StateObject(wrappedValue: viewModel)
-        _isLiveCamera = isLiveCamera
+        _hidesFloatingDock = hidesFloatingDock
     }
     
     var body: some View {
@@ -75,6 +77,7 @@ struct CameraView: View {
                     selectedReferenceImage: selectedReferenceImage,
                     analysisStage: referenceAnalysisStage,
                     generatedPreset: referenceGeneratedPreset,
+                    generatedRecipe: referenceGeneratedRecipe,
                     onBack: { resetReferenceFlow(); step = .select },
                     onConfirm: {
                         guard let preset = referenceGeneratedPreset else { return }
@@ -181,7 +184,8 @@ struct CameraView: View {
             }
         }
         .onChange(of: step) { _, newStep in
-            isLiveCamera = (newStep == .camera)
+            // selection은 dock 유지, 그 외 모든 sub-step에서 dock 숨김
+            hidesFloatingDock = (newStep != .select)
         }
         .task(id: step) {
             // 카메라 단계에서만 AVCaptureSession을 실행하고, 나머지 단계에서는 중지한다.
@@ -260,34 +264,49 @@ struct CameraView: View {
               let image = UIImage(data: data) else { return }
         await MainActor.run {
             selectedReferenceImage = image
+            referenceImageData = data
         }
-        analyzeReferencePhotoAndMove(image: image)
+        analyzeReferencePhotoAndMove(image: image, data: data)
     }
-    
-    private func analyzeReferencePhotoAndMove(image: UIImage) {
+
+    private func analyzeReferencePhotoAndMove(image: UIImage, data: Data) {
         guard referenceAnalysisStage == .idle || referenceAnalysisStage == .completed else { return }
         referenceGeneratedPreset = nil
+        referenceGeneratedRecipe = nil
         referenceAnalysisStage = .extractingTone
 
         Task { @MainActor in
-            // 3단계 분석 애니메이션 — 총 ~1.8초.
+            // 단계 1: 톤 분석
             try? await Task.sleep(nanoseconds: 650_000_000)
             referenceAnalysisStage = .extractingColor
+
+            // 단계 2: 컬러 추출
             try? await Task.sleep(nanoseconds: 650_000_000)
             referenceAnalysisStage = .generatingPreset
 
-            // 실제 프리셋 분석은 이 시점에 수행
+            // 단계 3: 프리셋 분석 (동기, 가벼움)
             let preset = assistService.analyzeReferenceImage(image)
-
             try? await Task.sleep(nanoseconds: 500_000_000)
             referenceGeneratedPreset = preset
-            referenceAnalysisStage = .completed
+
+            // 단계 4: 샷 레시피 추출 — 실제 Vision/DeepLabV3 분석, 백그라운드에서 실행
+            referenceAnalysisStage = .extractingShot
+            let recipe = await Task.detached(priority: .userInitiated) {
+                await ShotRecipeAnalyzer().analyze(imageData: data)
+            }.value
+
+            await MainActor.run {
+                referenceGeneratedRecipe = recipe
+                referenceAnalysisStage = .completed
+            }
         }
     }
 
     private func resetReferenceFlow() {
         referenceAnalysisStage = .idle
         referenceGeneratedPreset = nil
+        referenceGeneratedRecipe = nil
+        referenceImageData = nil
         selectedReferenceImage = nil
         referencePickerItem = nil
     }
