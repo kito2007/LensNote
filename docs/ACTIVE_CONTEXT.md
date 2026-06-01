@@ -471,16 +471,27 @@ tasks.md task 4(4.1) 체크. Build ✅ / Test ✅ 20.
 - property 테스트 4건(9.2 Property 8): 랜덤 100회 불변식 + tie-break/nil/빈배열.
 tasks.md task 9(9.1/9.2) 체크. Build ✅ / Test ✅ 24.
 
+## Completed Work (2026-06-02 — 지도 기간/지역 필터 Req 6)
+
+지도 기간 필터 + 지역(영역) 목록. 2커밋.
+- `DateRangeFilter`(all/today/thisWeek/thisMonth) `includes(_:now:calendar:)`: today=같은 날, thisWeek=직전 월요일 00:00↑(firstWeekday 무관 월요일 고정), thisMonth=1일 00:00↑, all=true. 로컬 타임존.
+- `MapViewModel`: `activeDateFilter`(.all 기본) + `filteredPins` + `applyDateFilter`(선택 핀이 새 필터 미포함이면 closeCard, Req 6.6).
+- `DateFilterChipRow`(상단 칩, 활성 accentCyan / 비활성 surfaceHigh·textTertiary, 식별자 `map.filter.<case>`). `MapView.visiblePins`를 `filteredPins` 기반으로 전환 → 클러스터+목록 모두 기간 반영. 0건 시 "이 기간에 촬영된 사진이 없어요"(6.5). 지역 필터는 기존 `visiblePins`(현재 영역 내, 6.7).
+- 공간 판정 `isCoordinate`를 `MapRegionFilter.contains(_:in:)` 순수 함수로 추출.
+- property 테스트 6건(8.2 Property 3 / 8.3 Property 4 / 8.5 Property 5).
+tasks.md task 8(8.1~8.5) 체크. Build ✅ / Test ✅ 30.
+
 ## Next Recommended Tasks (in priority order)
 
-> **다음 세션 시작점**: Req 8/9 + Req 1 + Req 12 + Req 4 + Req 2 + Req 3 + Req 5 완료. 다음은 지도 필터(Req 6).
+> **다음 세션 시작점**: Req 1/2/3/4/5/6/8/9/12 완료. 남은 핵심 기능 거의 소진 — 안전성/지표/체크포인트.
 > 진행 방침: 작업마다 커밋 분리.
 
-1. **지도 기간/지역 필터 (Req 6)** — `DateRangeFilter`(오늘/이번주/이번달/전체) + 칩 UI + 지역 필터. design.md Property 3(`DateRangeFilter.includes(_:now:calendar:)`) 테스트 대상. 순수 함수 부분은 저위험.
-2. **런타임 영속성 통합 검증 (Req 8 잔여)** — camera → save → force-quit → relaunch → map pin 수동 QA.
-3. **face landmarks pitch 시뮬레이터 한계 모니터링 (Req 10)** — 실기기 pitch 가능성. 라이브 angle 코칭(Req 1)도 이 추정에 의존.
+1. **런타임 영속성 통합 검증 (Req 8 잔여)** — camera → save → force-quit → relaunch → map pin 수동 QA(실기기).
+2. **face landmarks pitch 시뮬레이터 한계 모니터링 (Req 10, task 12)** — 실기기 pitch 가능성. 라이브 angle 코칭(Req 1)도 이 추정에 의존. 시뮬레이터 의존 시 cameraAngle midY fallback 검토.
+3. **목표 기능 달성도 평가 지표 (Req 13, task 13)** — 달성도 로그/검증 포인트. 선택적.
+4. **체크포인트 (task 2/6/10/14)** — 빌드/전체 기능 확인 단계(문서적).
 
-남은 Kiro 태스크: Req 6(지도 필터), Req 10(pitch 안전성), Req 13(달성도 지표), 체크포인트(task 2/6/10/14).
+남은 Kiro 태스크: Req 10(task 12 pitch 안전성), Req 13(task 13 지표), 체크포인트(task 2/6/10/14). 핵심 12개 요구사항 중 기능 구현은 대부분 완료.
 
 > ⚠️ **라이브 코칭 실기기 검증 잔여 (Req 1)**: 라이브 경로엔 face landmark가 없어 `cameraAngle`은 항상 nil → 현재 coverage 코칭("더 멀리/더 가까이")만 실제 동작. 앵글 코칭은 live ShotRecipe에 앵글이 추정되어야 동작(Req 10 pitch 연동 필요). 코칭 배너 체감/임계값(0.15)은 실기기에서 튜닝 필요.
 

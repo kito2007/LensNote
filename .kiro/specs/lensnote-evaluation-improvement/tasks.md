@@ -117,8 +117,8 @@
     - **Validates: Requirements 9.6**
     - 랜덤 FilterPreset 생성 → JSON encode → decode → 동일 프로퍼티 검증, 100회 반복
 
-- [ ] 8. 지도 기간/지역 필터 구현
-  - [ ] 8.1 DateRangeFilter 열거형 및 MapViewModel 필터 로직 구현
+- [x] 8. 지도 기간/지역 필터 구현
+  - [x] 8.1 DateRangeFilter 열거형 및 MapViewModel 필터 로직 구현
     - `Features/Map/DateRangeFilter.swift` 생성
     - `DateRangeFilter` enum 정의 (today/thisWeek/thisMonth/all) + `includes(_:now:calendar:)` 메서드
     - "오늘": 당일 00:00:00~현재, "이번 주": 직전 월요일 00:00:00~현재, "이번 달": 당월 1일 00:00:00~현재, "전체": 항상 true
@@ -128,24 +128,24 @@
     - 기기 로컬 타임존 기준 비교
     - _Requirements: 6.1, 6.2, 6.6_
 
-  - [ ]* 8.2 Write property test for DateRangeFilter date inclusion
+  - [x]* 8.2 Write property test for DateRangeFilter date inclusion
     - **Property 3: DateRangeFilter date inclusion correctness**
     - **Validates: Requirements 6.1, 6.2**
     - 랜덤 Date + 랜덤 filter + 고정 now로 100회 반복 검증
 
-  - [ ]* 8.3 Write property test for filter change clears invalid selection
+  - [x]* 8.3 Write property test for filter change clears invalid selection
     - **Property 4: Filter change clears invalid selection**
     - **Validates: Requirements 6.6**
     - 랜덤 pin + 랜덤 filter 전환으로 100회 반복 검증
 
-  - [ ] 8.4 MapView 필터 칩 UI 및 지역 필터 구현
+  - [x] 8.4 MapView 필터 칩 UI 및 지역 필터 구현
     - 지도 상단에 기간 필터 선택 칩 행 표시, 기본값 "전체"
     - 선택된 칩: accentCyan 강조, 나머지: LensNoteTheme 비활성 배경/텍스트
     - 필터 결과 0건 시 "이 기간에 촬영된 사진이 없어요" 빈 상태 메시지 표시
     - 지도 영역 변경 시 현재 화면 영역 내 PhotoPin만 목록 패널에 표시 (지역 기반 탐색)
     - _Requirements: 6.3, 6.4, 6.5, 6.7_
 
-  - [ ]* 8.5 Write property test for spatial region filtering
+  - [x]* 8.5 Write property test for spatial region filtering
     - **Property 5: Spatial region filtering**
     - **Validates: Requirements 6.7**
     - 랜덤 좌표 핀 + 랜덤 MKCoordinateRegion으로 100회 반복 검증
