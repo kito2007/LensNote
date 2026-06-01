@@ -6,8 +6,8 @@
 
 ## Tasks
 
-- [ ] 1. 카메라 진입 플로우 간소화 및 MapView 파일 분리
-  - [ ] 1.1 MapView.swift 서브뷰를 별도 파일로 분리
+- [x] 1. 카메라 진입 플로우 간소화 및 MapView 파일 분리
+  - [x] 1.1 MapView.swift 서브뷰를 별도 파일로 분리
     - `Features/Map/Views/` 디렉토리에 PinAnnotationView.swift, ClusterBadgeView.swift, SidePanelList.swift, PinCardView.swift, PermissionOverlayView.swift, MapEmptyStateView.swift, LoadingBannerView.swift 생성
     - `Features/Map/Models/ClusterItem.swift` 생성
     - 각 struct의 접근 제어를 `private` → `internal`로 변경
@@ -15,7 +15,7 @@
     - 각 파일이 LensNoteTheme 토큰을 직접 참조하여 독립 렌더링 가능하도록 import 정리
     - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.5_
 
-  - [ ] 1.2 CameraView 플로우 간소화 — CameraSelectionStepView 제거 및 즉시 라이브 뷰 진입
+  - [x] 1.2 CameraView 플로우 간소화 — CameraSelectionStepView 제거 및 즉시 라이브 뷰 진입
     - `CameraInputMode` enum에서 `.select` 케이스 제거, 초기 step을 `.camera`로 변경
     - `CameraSelectionStepView.swift` 파일 제거 (또는 dead code 정리)
     - `InlineMode` enum 추가 (none/reference/concept/manual)
@@ -27,7 +27,7 @@
     - 이전 레퍼런스 설정 유지 상태로 재진입 지원
     - _Requirements: 12.1, 12.2, 12.3, 12.4, 12.5, 12.6, 12.7, 12.8_
 
-  - [ ] 1.3 접근성 식별자 추가
+  - [x] 1.3 접근성 식별자 추가
     - CameraLiveStepView: `"camera.shutter"`, `"camera.ai_magic"`, `"camera.guidance_banner"`, `"camera.side_map"`, `"camera.side_gallery"` 부여
     - CameraSelectionStepView 제거 후 해당 식별자(`"camera.select_reference"`, `"camera.select_concept"`)를 새 인라인 UI에 부여
     - MapView: 각 핀에 `"map.pin.\(photoPin.id)"` 형식 식별자 부여

@@ -422,20 +422,36 @@ Build: ✅ BUILD SUCCEEDED / Test: ✅ 13 tests passed (iPhone 17 Pro Simulator)
 3. **저장 ShotStyle 연결 (커밋 f2108e5)** — `saveCapturedImage`가 `referenceRecipe?.detectedStyle`을 `SavePhotoUseCase.execute(shotStyle:)`로 전달 → `PhotoItem.shotStyle` 영속화.
 
 tasks.md task 3(3.1~3.5) 전체 체크 완료.
-Build: ✅ BUILD SUCCEEDED / Test: ✅ 20 tests passed (iPhone 17 Pro Simulator). 실기기 코칭 체감/임계값 튜닝은 다음 세션.
+Build: ✅ BUILD SUCCEEDED / Test: ✅ 20 tests passed (iPhone 17 Pro Simulator). 라이브 코칭 실기기 확인 완료(사용자).
+
+## Completed Work (2026-06-01 — 카메라 진입 간소화 Req 12 + 접근성 Req 4)
+
+사용자 확정 방향(불필요한 단계 제거) + UX 결정(풀스크린 라이브 뷰 + 복귀 버튼 / 인라인 버튼 3개 + 시트). 2커밋.
+
+1. **진입 즉시 라이브 뷰 + 인라인 셋업 시트 (커밋 7abd1a9)**
+   - `CameraSelectionStepView` 제거(파일 삭제). `CameraInputMode`에서 select/photo/text/manual 제거 → `camera`/`result`만. 진입 시 바로 `.camera`.
+   - 레퍼런스/컨셉/수동을 라이브 뷰 위 `.sheet(item: CameraSetupSheet)`로 전환. 기존 step 뷰 3종(Reference/Concept/Manual)을 시트 콘텐츠로 **그대로 재사용**.
+   - `CameraLiveStepView`: 인라인 셋업 툴바(레퍼런스/컨셉/수동 3버튼, bottomCaptureBar 위) 추가. topBar back 버튼 → `house.fill` + `onExit`(홈 복귀). `onTapReference/Concept/Manual` 콜백 추가.
+   - **dock**: 카메라 탭은 항상 풀스크린 → `RootView.shouldHideDock = (selectedTab == .camera)`로 단순화. `cameraHidesDock` 상태/`hidesFloatingDock` 바인딩 **완전 제거**(TabView onAppear 타이밍 의존 제거). `CameraView(onExit:)`가 `selectedTab = .home`으로 복귀.
+   - 진입 경로별 `setReferenceRecipe` 호출 유지(레퍼런스 onConfirm→set, 컨셉/수동/reset→nil).
+2. **접근성 식별자 (커밋 직후 — Req 4 / task 1.3)**
+   - CameraLiveStepView: `camera.shutter`/`ai_magic`/`guidance_banner`/`side_map`/`side_gallery`/`select_reference`/`select_concept`/`select_manual`.
+   - FloatingDockBar: `dock.tab.home/camera/map/profile`(`AppTab.identifierKey` 추가). MapView 단일 핀: `map.pin.<id>`.
+
+tasks.md task 1(1.1~1.3) 전체 체크. Build: ✅ BUILD SUCCEEDED / Test: ✅ 20 passed.
+⚠️ 시뮬레이터는 카메라 피드 없음 → 라이브 뷰/시트 체감·홈 복귀 흐름 실기기 검증 필요.
 
 ## Next Recommended Tasks (in priority order)
 
-> **다음 세션 시작점**: Kiro 스펙 진행 — Req 8/9(기술 기반) + Req 1(라이브 코칭) 완료. 다음은 카메라 UX 간소화(Req 12).
-> 진행 방침: 작업마다 커밋 분리. 카메라 UX는 사용자에게 불필요한 단계 제거(Req 12 플로우 간소화).
+> **다음 세션 시작점**: Req 8/9 + Req 1(라이브 코칭) + Req 12(진입 간소화) + Req 4(a11y) 완료. 다음은 캡처 결과 피드백(Req 2).
+> 진행 방침: 작업마다 커밋 분리.
 
-1. **카메라 진입 플로우 간소화 (Req 12)** — ⚠️ 영향 범위 큼. `CameraSelectionStepView` 제거, 진입 즉시 `.camera`. **현재 dock 가시성이 `step != .select` 기준이라 RootView.shouldHideDock + CameraView onChange 동시 수정 필요**. 레퍼런스/컨셉/수동을 라이브 뷰 인라인/시트로 통합. ⚠️ 진입 경로별 `setReferenceRecipe(_:)` 호출(레퍼런스 코칭 범위 한정)이 인라인 전환 후에도 유지되도록 주의.
-2. **캡처 결과 피드백 강화 (Req 2)** — 위치명(역지오코딩 3s 타임아웃)/프리셋/ShotStyle 결과 카드 + "지도에서 보기". PhotoItem.shotStyle 이미 영속화됨(Req 1에서 연결).
-3. **카메라 사이드 버튼 연결 (Req 3)** + **접근성 식별자 (Req 4)** — 사이드 버튼 no-op 해소, `camera.*`/`map.pin.*`/`dock.tab.*` 식별자.
-4. **Profile 탭 완성 (Req 5)** — `ProfileStatsCalculator`로 촬영 통계(총촬영/최다 ShotStyle/최다 Preset). PhotoItem 신규 필드 활용.
-5. **지도 기간/지역 필터 (Req 6)** — `DateRangeFilter`(오늘/이번주/이번달/전체) + 칩 UI + 지역 필터.
-6. **런타임 영속성 통합 검증 (Req 8 잔여)** — camera → save → force-quit → relaunch → map pin 수동 QA.
-7. **face landmarks pitch 시뮬레이터 한계 모니터링 (Req 10)** — 실기기 pitch 가능성. 시뮬레이터 의존 시 cameraAngle midY fallback.
+1. **캡처 결과 피드백 강화 (Req 2)** — 위치명(역지오코딩 3s 타임아웃)/프리셋/ShotStyle 결과 카드 + "지도에서 보기". PhotoItem.shotStyle 이미 영속화됨(Req 1). `CameraCaptureResultStepView` 강화 대상.
+2. **카메라 사이드 버튼 연결 (Req 3)** — `camera.side_map`(지도 탭)/`camera.side_gallery`(PHPicker) no-op 해소. 식별자는 이미 부여됨(Req 4 완료).
+3. **Profile 탭 완성 (Req 5)** — `ProfileStatsCalculator`로 촬영 통계(총촬영/최다 ShotStyle/최다 Preset). PhotoItem 신규 필드 활용.
+4. **지도 기간/지역 필터 (Req 6)** — `DateRangeFilter`(오늘/이번주/이번달/전체) + 칩 UI + 지역 필터.
+5. **런타임 영속성 통합 검증 (Req 8 잔여)** — camera → save → force-quit → relaunch → map pin 수동 QA.
+6. **face landmarks pitch 시뮬레이터 한계 모니터링 (Req 10)** — 실기기 pitch 가능성. 라이브 angle 코칭(Req 1)도 이 추정에 의존.
 
 > ⚠️ **라이브 코칭 실기기 검증 잔여 (Req 1)**: 라이브 경로엔 face landmark가 없어 `cameraAngle`은 항상 nil → 현재 coverage 코칭("더 멀리/더 가까이")만 실제 동작. 앵글 코칭은 live ShotRecipe에 앵글이 추정되어야 동작(Req 10 pitch 연동 필요). 코칭 배너 체감/임계값(0.15)은 실기기에서 튜닝 필요.
 
