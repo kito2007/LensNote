@@ -78,6 +78,8 @@ struct MapView: View {
                     try? await Task.sleep(nanoseconds: 200_000_000)
                     await viewModel.loadPhotoPinsIfNeeded()
                     scheduleClusterRebuild(immediate: true)
+                    // Req 2.2 — onChange 부착 전에 설정된 포커스 요청(콜드스타트)도 적용.
+                    if let coord = viewModel.focusCoordinate { focusCamera(on: coord) }
                 }
                 // 카메라 변경 시 현재 영역 업데이트
                 .onMapCameraChange { context in
@@ -134,16 +136,7 @@ struct MapView: View {
                 }
                 // Req 2.2 — 카메라 결과 카드에서 요청한 핀으로 카메라 이동.
                 .onChange(of: viewModel.focusCoordinate) { _, coord in
-                    guard let coord else { return }
-                    withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
-                        position = .region(
-                            MKCoordinateRegion(
-                                center: CLLocationCoordinate2D(latitude: coord.latitude, longitude: coord.longitude),
-                                span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
-                            )
-                        )
-                    }
-                    viewModel.clearFocus()
+                    if let coord { focusCamera(on: coord) }
                 }
                 // 로딩 배너 표시
                 .safeAreaInset(edge: .top) {
@@ -258,6 +251,19 @@ struct MapView: View {
     }
 
     /// 영역 스케일에 따라 적응형 격자 크기를 계산하여 클러스터링(단일/클러스터 아이템 생성)
+    /// 지정 좌표로 지도 카메라를 이동하고 포커스 요청을 소비한다 (Req 2.2).
+    private func focusCamera(on coord: GeoCoordinate) {
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+            position = .region(
+                MKCoordinateRegion(
+                    center: CLLocationCoordinate2D(latitude: coord.latitude, longitude: coord.longitude),
+                    span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
+                )
+            )
+        }
+        viewModel.clearFocus()
+    }
+
     private func buildClusters(from pins: [PhotoPin], in region: MKCoordinateRegion?) -> [ClusterItem] {
         guard let region else { return pins.map { ClusterItem(id: $0.id, kind: .single($0)) } }
         // Determine grid size based on zoom level
