@@ -72,8 +72,8 @@
     - `liveCoachingMessage` 프로퍼티 추가 및 CameraView에서 전달
     - _Requirements: 1.4_
 
-- [ ] 4. 카메라 사이드 버튼 액션 연결
-  - [ ] 4.1 사이드 버튼 콜백 구현
+- [x] 4. 카메라 사이드 버튼 액션 연결
+  - [x] 4.1 사이드 버튼 콜백 구현
     - CameraLiveStepView에 `onMapTap`, `onGalleryTap` 콜백 추가
     - 지도 버튼 탭 → 지도 탭 전환 콜백 호출
     - 갤러리 버튼 탭 → PHPickerViewController 표시

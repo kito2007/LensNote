@@ -452,16 +452,24 @@ tasks.md task 1(1.1~1.3) 전체 체크. Build: ✅ BUILD SUCCEEDED / Test: ✅ 2
 tasks.md task 5(5.1) 체크. Build: ✅ / Test: ✅ 20 passed.
 ⚠️ 시뮬레이터 카메라 피드 없음 → 결과 카드 표시·역지오코딩·지도 이동 실기기 검증 필요.
 
+## Completed Work (2026-06-01 — 카메라 사이드 버튼 Req 3)
+
+라이브 뷰 no-op 사이드 버튼에 액션 연결. 1커밋.
+- `CameraLiveStepView`: `onMapTap`/`onGalleryTap` 콜백 + `sideButton(action:)` 연결.
+- 지도 버튼 → `onOpenMap`(RootView가 `selectedTab=.map`, 핀 선택 없음, Req 3.1).
+- 갤러리 버튼 → `.photosPicker(isPresented:)` 직접 표시(Req 3.2). 선택 시 `referencePickerItem` onChange가 `activeSetupSheet=.reference`로 분석 시트 오픈(Req 3.3), 취소 시 라이브 유지(Req 3.4). 시트 내 PhotosPicker와 동일 바인딩 공유.
+- Req 3.5: PHPicker는 out-of-process라 사진 권한 불필요 → 거부 시나리오 없음(게이트 불필요).
+tasks.md task 4(4.1) 체크. Build ✅ / Test ✅ 20.
+
 ## Next Recommended Tasks (in priority order)
 
-> **다음 세션 시작점**: Req 8/9 + Req 1 + Req 12 + Req 4 + Req 2 완료. 다음은 카메라 사이드 버튼(Req 3).
+> **다음 세션 시작점**: Req 8/9 + Req 1 + Req 12 + Req 4 + Req 2 + Req 3 완료. 다음은 Profile 탭(Req 5).
 > 진행 방침: 작업마다 커밋 분리.
 
-1. **카메라 사이드 버튼 연결 (Req 3)** — 라이브 뷰 `camera.side_map`(지도 탭 이동)/`camera.side_gallery`(PHPicker) no-op 해소. 식별자는 이미 부여됨(Req 4). 지도 이동은 Req 2의 onNavigateToMap/탭 전환 패턴 참고 가능(단 좌표 없이 단순 탭 전환).
-2. **Profile 탭 완성 (Req 5)** — `ProfileStatsCalculator`로 촬영 통계(총촬영/최다 ShotStyle/최다 Preset). PhotoItem 신규 필드 활용.
-3. **지도 기간/지역 필터 (Req 6)** — `DateRangeFilter`(오늘/이번주/이번달/전체) + 칩 UI + 지역 필터.
-4. **런타임 영속성 통합 검증 (Req 8 잔여)** — camera → save → force-quit → relaunch → map pin 수동 QA.
-5. **face landmarks pitch 시뮬레이터 한계 모니터링 (Req 10)** — 실기기 pitch 가능성. 라이브 angle 코칭(Req 1)도 이 추정에 의존.
+1. **Profile 탭 완성 (Req 5)** — `ProfileStatsCalculator`로 촬영 통계(총촬영/최다 ShotStyle/최다 Preset). PhotoItem 신규 필드(shotStyle/filterPresetName) 활용. 순수 함수라 property test 추가 가능(저위험).
+2. **지도 기간/지역 필터 (Req 6)** — `DateRangeFilter`(오늘/이번주/이번달/전체) + 칩 UI + 지역 필터. design.md Property 3(DateRangeFilter.includes) 테스트 대상.
+3. **런타임 영속성 통합 검증 (Req 8 잔여)** — camera → save → force-quit → relaunch → map pin 수동 QA.
+4. **face landmarks pitch 시뮬레이터 한계 모니터링 (Req 10)** — 실기기 pitch 가능성. 라이브 angle 코칭(Req 1)도 이 추정에 의존.
 
 > ⚠️ **라이브 코칭 실기기 검증 잔여 (Req 1)**: 라이브 경로엔 face landmark가 없어 `cameraAngle`은 항상 nil → 현재 coverage 코칭("더 멀리/더 가까이")만 실제 동작. 앵글 코칭은 live ShotRecipe에 앵글이 추정되어야 동작(Req 10 pitch 연동 필요). 코칭 배너 체감/임계값(0.15)은 실기기에서 튜닝 필요.
 
