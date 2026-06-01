@@ -441,17 +441,27 @@ Build: ✅ BUILD SUCCEEDED / Test: ✅ 20 tests passed (iPhone 17 Pro Simulator)
 tasks.md task 1(1.1~1.3) 전체 체크. Build: ✅ BUILD SUCCEEDED / Test: ✅ 20 passed.
 ⚠️ 시뮬레이터는 카메라 피드 없음 → 라이브 뷰/시트 체감·홈 복귀 흐름 실기기 검증 필요.
 
+## Completed Work (2026-06-01 — 캡처 결과 카드 Req 2)
+
+저장 후 라이브 뷰로 즉시 복귀하던 흐름 → 결과 카드로 전환. 2커밋(78e248a 본체 + 콜드스타트 포커스 fix).
+
+1. **CaptureResultInfo + 역지오코딩** — `CaptureResultInfo`(photoID/thumbnail/placeName/preset/shotStyleLabel/coordinate/canNavigateToMap). `CameraViewModel.captureResult`(@Published). `saveCapturedImage` 성공 시 결과 구성 + `startPlaceNameResolution`(CLGeocoder, `withTaskGroup`로 지오코딩 vs 3s 타임아웃 경합 → 실패 "위치명을 불러올 수 없음", 좌표 nil "위치 정보 없음"). `clearCaptureResult()`로 다시찍기/새촬영 시 초기화.
+2. **결과 카드 UI** — `CameraCaptureResultStepView`: result nil=저장 전 확인(+실패 시 에러/재시도, capturedImage 유지 Req 2.4), result 존재=카드(썸네일/위치/프리셋/ShotStyle + "새 촬영"/"지도에서 보기"). 좌표 nil이면 지도 버튼 비활성(Req 2.3). `ShotStyle.koreanDescription/displayLabel` internal 승격해 재사용. 사용 안 하게 된 successToast/showTransientSuccess 제거.
+3. **지도 이동(Req 2.2)** — `CameraView.onNavigateToMap(UUID)` → `RootView`가 지도 탭 전환 + `MapViewModel.requestSelection(id)`. MapVM: `loadLensNotePins()`로 방금 저장 핀 갱신 → 해당 핀 `selectedPin` + `focusCoordinate` 발행(없으면 `pendingSelectionID` 보류 후 로드 시 적용). MapView `focusCamera(on:)`로 카메라 이동(onChange + .task 양쪽). **PhotoPin.id == PhotoItem.id** 활용.
+
+tasks.md task 5(5.1) 체크. Build: ✅ / Test: ✅ 20 passed.
+⚠️ 시뮬레이터 카메라 피드 없음 → 결과 카드 표시·역지오코딩·지도 이동 실기기 검증 필요.
+
 ## Next Recommended Tasks (in priority order)
 
-> **다음 세션 시작점**: Req 8/9 + Req 1(라이브 코칭) + Req 12(진입 간소화) + Req 4(a11y) 완료. 다음은 캡처 결과 피드백(Req 2).
+> **다음 세션 시작점**: Req 8/9 + Req 1 + Req 12 + Req 4 + Req 2 완료. 다음은 카메라 사이드 버튼(Req 3).
 > 진행 방침: 작업마다 커밋 분리.
 
-1. **캡처 결과 피드백 강화 (Req 2)** — 위치명(역지오코딩 3s 타임아웃)/프리셋/ShotStyle 결과 카드 + "지도에서 보기". PhotoItem.shotStyle 이미 영속화됨(Req 1). `CameraCaptureResultStepView` 강화 대상.
-2. **카메라 사이드 버튼 연결 (Req 3)** — `camera.side_map`(지도 탭)/`camera.side_gallery`(PHPicker) no-op 해소. 식별자는 이미 부여됨(Req 4 완료).
-3. **Profile 탭 완성 (Req 5)** — `ProfileStatsCalculator`로 촬영 통계(총촬영/최다 ShotStyle/최다 Preset). PhotoItem 신규 필드 활용.
-4. **지도 기간/지역 필터 (Req 6)** — `DateRangeFilter`(오늘/이번주/이번달/전체) + 칩 UI + 지역 필터.
-5. **런타임 영속성 통합 검증 (Req 8 잔여)** — camera → save → force-quit → relaunch → map pin 수동 QA.
-6. **face landmarks pitch 시뮬레이터 한계 모니터링 (Req 10)** — 실기기 pitch 가능성. 라이브 angle 코칭(Req 1)도 이 추정에 의존.
+1. **카메라 사이드 버튼 연결 (Req 3)** — 라이브 뷰 `camera.side_map`(지도 탭 이동)/`camera.side_gallery`(PHPicker) no-op 해소. 식별자는 이미 부여됨(Req 4). 지도 이동은 Req 2의 onNavigateToMap/탭 전환 패턴 참고 가능(단 좌표 없이 단순 탭 전환).
+2. **Profile 탭 완성 (Req 5)** — `ProfileStatsCalculator`로 촬영 통계(총촬영/최다 ShotStyle/최다 Preset). PhotoItem 신규 필드 활용.
+3. **지도 기간/지역 필터 (Req 6)** — `DateRangeFilter`(오늘/이번주/이번달/전체) + 칩 UI + 지역 필터.
+4. **런타임 영속성 통합 검증 (Req 8 잔여)** — camera → save → force-quit → relaunch → map pin 수동 QA.
+5. **face landmarks pitch 시뮬레이터 한계 모니터링 (Req 10)** — 실기기 pitch 가능성. 라이브 angle 코칭(Req 1)도 이 추정에 의존.
 
 > ⚠️ **라이브 코칭 실기기 검증 잔여 (Req 1)**: 라이브 경로엔 face landmark가 없어 `cameraAngle`은 항상 nil → 현재 coverage 코칭("더 멀리/더 가까이")만 실제 동작. 앵글 코칭은 live ShotRecipe에 앵글이 추정되어야 동작(Req 10 pitch 연동 필요). 코칭 배너 체감/임계값(0.15)은 실기기에서 튜닝 필요.
 

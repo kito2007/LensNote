@@ -83,8 +83,8 @@
     - AccessibilityIdentifier: `"camera.side_map"`, `"camera.side_gallery"` 확인
     - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6_
 
-- [ ] 5. 캡처 결과 피드백 강화
-  - [ ] 5.1 CameraCaptureResultStepView 결과 카드 구현
+- [x] 5. 캡처 결과 피드백 강화
+  - [x] 5.1 CameraCaptureResultStepView 결과 카드 구현
     - `CaptureResultInfo` 모델 정의 (thumbnail, placeName, filterPresetName, shotStyleLabel, coordinate, canNavigateToMap)
     - 저장 완료 후 1초 이내에 결과 카드 표시
     - 역지오코딩 결과 표시 (3초 타임아웃 → "위치명을 불러올 수 없음")
