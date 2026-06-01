@@ -9,14 +9,19 @@ import SwiftUI
 import PhotosUI
 import UIKit
 
-/// 카메라 플로우 단계 상태.
+/// 카메라 플로우 단계 상태. Req 12 — 진입 즉시 라이브 뷰(`camera`), 촬영 후 결과(`result`)만 남긴다.
+/// 레퍼런스/컨셉/수동 설정은 라이브 뷰 위 시트(`CameraSetupSheet`)로 전환됐다.
 private enum CameraInputMode: String {
-    case select
-    case photo
-    case text
-    case manual
     case camera
     case result
+}
+
+/// 라이브 뷰에서 인라인으로 여는 셋업 시트 종류 (Req 12).
+private enum CameraSetupSheet: String, Identifiable {
+    case reference
+    case concept
+    case manual
+    var id: String { rawValue }
 }
 
 /// Camera 화면 공통 디자인 상수.
@@ -32,10 +37,11 @@ struct CameraDesign {
 /// 입력(레퍼런스/텍스트/수동) -> 촬영 -> 결과 저장의 플로우를 하나의 상태 머신(step)으로 관리한다.
 struct CameraView: View {
     @StateObject private var viewModel: CameraViewModel
-    /// selection 진입점 이외의 카메라 sub-step에서 true — RootView FloatingDockBar 숨김에 사용.
-    @Binding var hidesFloatingDock: Bool
+    /// 풀스크린 라이브 뷰에서 홈으로 복귀(dock이 없으므로 탭 전환 경로 제공) (Req 12).
+    private let onExit: () -> Void
 
-    @State private var step: CameraInputMode = .select
+    @State private var step: CameraInputMode = .camera
+    @State private var activeSetupSheet: CameraSetupSheet? = nil
     @State private var conceptInput: String = ""
     @State private var referencePickerItem: PhotosPickerItem?
     @State private var selectedReferenceImage: UIImage?
@@ -56,73 +62,17 @@ struct CameraView: View {
     
     private let assistService: CameraAssistServiceProtocol = CoreMLCameraAssistService()
     
-    init(viewModel: CameraViewModel, hidesFloatingDock: Binding<Bool> = .constant(false)) {
+    init(
+        viewModel: CameraViewModel,
+        onExit: @escaping () -> Void = {}
+    ) {
         _viewModel = StateObject(wrappedValue: viewModel)
-        _hidesFloatingDock = hidesFloatingDock
+        self.onExit = onExit
     }
     
     var body: some View {
         ZStack {
             switch step {
-            case .select:
-                CameraSelectionStepView(
-                    onSelectPhoto: { step = .photo},
-                    onSelectText: {step = .text},
-                    onSelectManual: {step = .manual},
-                    onSelectCamera: {step = .camera}
-                )
-            case .photo:
-                CameraReferenceStepView(
-                    referencePickerItem: $referencePickerItem,
-                    selectedReferenceImage: selectedReferenceImage,
-                    analysisStage: referenceAnalysisStage,
-                    generatedPreset: referenceGeneratedPreset,
-                    generatedRecipe: referenceGeneratedRecipe,
-                    onBack: { resetReferenceFlow(); step = .select },
-                    onConfirm: {
-                        guard let preset = referenceGeneratedPreset else { return }
-                        viewModel.preset = preset
-                        viewModel.conceptText = "Reference Mood"
-                        // Req 1 — 레퍼런스 ShotRecipe를 VM에 전달해 라이브 코칭 활성화.
-                        viewModel.setReferenceRecipe(referenceGeneratedRecipe)
-                        step = .camera
-                    }
-                )
-            case .text:
-                CameraConceptStepView(
-                    conceptInput: $conceptInput,
-                    onBack: { step = .select },
-                    onStartCamera: {
-                        viewModel.conceptText = conceptInput
-                        viewModel.applyConcept()
-                        // 컨셉 경로 진입 — 레퍼런스 코칭 비활성화.
-                        viewModel.setReferenceRecipe(nil)
-                        step = .camera
-                    }
-                )
-            case .manual:
-                CameraManualStepView(
-                    onBack: {step = .select},
-                    onStartCamera: {
-                        viewModel.conceptText = "Manual"
-                        viewModel.preset = FilterPreset(
-                            name: "Manual",
-                            exposure: manualExposure,
-                            contrast: manualContrast,
-                            saturation: manualSaturation,
-                            temperature: manualTemperature,
-                            vignette: manualVignette
-                        )
-                        // 수동 경로 진입 — 레퍼런스 코칭 비활성화.
-                        viewModel.setReferenceRecipe(nil)
-                        step = .camera
-                    },
-                    manualExposure: $manualExposure,
-                    manualContrast: $manualContrast,
-                    manualSaturation: $manualSaturation,
-                    manualTemperature: $manualTemperature,
-                    manualVignette: $manualVignette)
-                
             case .camera:
                 CameraLiveStepView(
                     session: viewModel.session,
@@ -140,7 +90,7 @@ struct CameraView: View {
                     inferenceScore: viewModel.inferenceScore,
                     activeGuidanceHint: viewModel.activeGuidanceHint,
                     referenceImage: selectedReferenceImage,
-                    onBack: { step = .select },
+                    onExit: onExit,
                     onToggleGrid: { showGrid.toggle() },
                     onCapture: {
                         Task {
@@ -151,7 +101,10 @@ struct CameraView: View {
                                 }
                             }
                         }
-                    }
+                    },
+                    onTapReference: { activeSetupSheet = .reference },
+                    onTapConcept: { activeSetupSheet = .concept },
+                    onTapManual: { activeSetupSheet = .manual }
                 )
             case .result:
                 CameraCaptureResultStepView(
@@ -189,12 +142,8 @@ struct CameraView: View {
                 viewModel.hasLocationWarning = false
             }
         }
-        .onChange(of: step) { _, newStep in
-            // selection은 dock 유지, 그 외 모든 sub-step에서 dock 숨김
-            hidesFloatingDock = (newStep != .select)
-        }
         .task(id: step) {
-            // 카메라 단계에서만 AVCaptureSession을 실행하고, 나머지 단계에서는 중지한다.
+            // 라이브 뷰에서만 AVCaptureSession을 실행하고, 결과 단계에서는 중지한다.
             if step == .camera {
                 await viewModel.startSessionIfNeeded()
             } else {
@@ -205,10 +154,72 @@ struct CameraView: View {
             guard let newItem else { return }
             Task { await loadReferenceImage(from: newItem) }
         }
+        .sheet(item: $activeSetupSheet) { sheet in
+            setupSheet(sheet)
+        }
         .alert("카메라 권한 필요", isPresented: .constant(viewModel.isCameraAuthorized == false)) {
             Button("확인", role: .cancel) {}
         } message: {
             Text("설정에서 카메라 접근을 허용해주세요.")
+        }
+    }
+
+    /// 라이브 뷰 위에 인라인으로 띄우는 셋업 시트. 적용/취소 후 시트를 닫고 라이브 뷰로 돌아온다(Req 12).
+    @ViewBuilder
+    private func setupSheet(_ sheet: CameraSetupSheet) -> some View {
+        switch sheet {
+        case .reference:
+            CameraReferenceStepView(
+                referencePickerItem: $referencePickerItem,
+                selectedReferenceImage: selectedReferenceImage,
+                analysisStage: referenceAnalysisStage,
+                generatedPreset: referenceGeneratedPreset,
+                generatedRecipe: referenceGeneratedRecipe,
+                onBack: { resetReferenceFlow(); activeSetupSheet = nil },
+                onConfirm: {
+                    guard let preset = referenceGeneratedPreset else { return }
+                    viewModel.preset = preset
+                    viewModel.conceptText = "Reference Mood"
+                    // Req 1 — 레퍼런스 ShotRecipe를 VM에 전달해 라이브 코칭 활성화.
+                    viewModel.setReferenceRecipe(referenceGeneratedRecipe)
+                    activeSetupSheet = nil
+                }
+            )
+        case .concept:
+            CameraConceptStepView(
+                conceptInput: $conceptInput,
+                onBack: { activeSetupSheet = nil },
+                onStartCamera: {
+                    viewModel.conceptText = conceptInput
+                    viewModel.applyConcept()
+                    // 컨셉 적용 — 레퍼런스 코칭 비활성화.
+                    viewModel.setReferenceRecipe(nil)
+                    activeSetupSheet = nil
+                }
+            )
+        case .manual:
+            CameraManualStepView(
+                onBack: { activeSetupSheet = nil },
+                onStartCamera: {
+                    viewModel.conceptText = "Manual"
+                    viewModel.preset = FilterPreset(
+                        name: "Manual",
+                        exposure: manualExposure,
+                        contrast: manualContrast,
+                        saturation: manualSaturation,
+                        temperature: manualTemperature,
+                        vignette: manualVignette
+                    )
+                    // 수동 적용 — 레퍼런스 코칭 비활성화.
+                    viewModel.setReferenceRecipe(nil)
+                    activeSetupSheet = nil
+                },
+                manualExposure: $manualExposure,
+                manualContrast: $manualContrast,
+                manualSaturation: $manualSaturation,
+                manualTemperature: $manualTemperature,
+                manualVignette: $manualVignette
+            )
         }
     }
     

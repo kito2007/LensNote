@@ -14,9 +14,6 @@ struct RootView: View {
     let container: DIContainer
     @StateObject private var mapVM: MapViewModel
     @State private var selectedTab: AppTab = .home
-    /// 카메라 탭의 현재 sub-step이 dock을 숨겨야 하는 상태일 때 true.
-    /// selection 진입점은 dock 유지, concept/manual/reference/live/result는 숨김.
-    @State private var cameraHidesDock: Bool = false
 
     init(cameraVM: CameraViewModel, container: DIContainer) {
         self.cameraVM = cameraVM
@@ -25,10 +22,10 @@ struct RootView: View {
     }
 
     /// dock을 숨겨야 하면 true.
-    /// - 카메라 탭이 활성이고 selection 이외의 sub-step(concept/manual/reference/live/result)일 때만 true.
+    /// - Req 12: 카메라 탭은 풀스크린 라이브 뷰라 항상 dock을 숨긴다(복귀는 라이브 뷰의 홈 버튼).
     /// - 다른 탭(Home/Map/Profile)이 활성일 때는 항상 false(dock 표시).
     private var shouldHideDock: Bool {
-        selectedTab == .camera && cameraHidesDock
+        selectedTab == .camera
     }
 
     var body: some View {
@@ -42,7 +39,10 @@ struct RootView: View {
                 )
                 .tag(AppTab.home)
 
-                CameraView(viewModel: cameraVM, hidesFloatingDock: $cameraHidesDock)
+                CameraView(
+                    viewModel: cameraVM,
+                    onExit: { selectedTab = .home }
+                )
                     .tag(AppTab.camera)
 
                 MapView(viewModel: mapVM, onCameraTabTap: {

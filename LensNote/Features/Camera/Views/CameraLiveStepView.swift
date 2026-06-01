@@ -29,9 +29,14 @@ struct CameraLiveStepView: View {
     /// 사용자가 업로드한 레퍼런스 이미지. nil이면 REF 썸네일에 placeholder가 표시된다.
     var referenceImage: UIImage? = nil
 
-    let onBack: () -> Void
+    /// 카메라 탭을 벗어나 홈으로 복귀(풀스크린 라이브 뷰에는 dock이 없으므로 별도 복귀 경로).
+    let onExit: () -> Void
     let onToggleGrid: () -> Void
     let onCapture: () -> Void
+    /// 인라인 셋업 진입점 — 레퍼런스/컨셉/수동 시트를 연다(Req 12).
+    var onTapReference: () -> Void = {}
+    var onTapConcept: () -> Void = {}
+    var onTapManual: () -> Void = {}
 
     var body: some View {
         ZStack {
@@ -103,6 +108,9 @@ struct CameraLiveStepView: View {
             // MARK: - Bottom capture controls + guidance banner
             VStack(spacing: LensNoteTheme.Spacing.xs) {
                 Spacer()
+                // 인라인 셋업 진입점 — 레퍼런스/컨셉/수동 (Req 12)
+                setupToolbar
+                    .padding(.horizontal, LensNoteTheme.Spacing.xl)
                 if let activeGuidanceHint {
                     guidanceBanner(activeGuidanceHint)
                         .transition(.asymmetric(
@@ -151,8 +159,8 @@ struct CameraLiveStepView: View {
 
     private var topBar: some View {
         HStack {
-            Button(action: onBack) {
-                Image(systemName: "chevron.left")
+            Button(action: onExit) {
+                Image(systemName: "house.fill")
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(LensNoteTheme.Colors.textPrimary)
                     .frame(width: 40, height: 40)
@@ -161,7 +169,7 @@ struct CameraLiveStepView: View {
                     .clipShape(Circle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("뒤로")
+            .accessibilityLabel("홈으로")
 
             Spacer()
 
@@ -365,6 +373,41 @@ struct CameraLiveStepView: View {
                 .shadow(color: LensNoteTheme.Shadow.elevated, radius: 12, y: 4)
         }
         .buttonStyle(.plain)
+    }
+
+    // MARK: - Inline Setup Toolbar (Req 12)
+
+    /// 라이브 뷰 안에서 레퍼런스/컨셉/수동 설정을 여는 인라인 진입점.
+    private var setupToolbar: some View {
+        HStack(spacing: LensNoteTheme.Spacing.xs) {
+            setupButton(icon: "photo.on.rectangle", title: "레퍼런스", action: onTapReference)
+            setupButton(icon: "sparkles", title: "컨셉", action: onTapConcept)
+            setupButton(icon: "slider.horizontal.3", title: "수동", action: onTapManual)
+        }
+    }
+
+    private func setupButton(icon: String, title: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: LensNoteTheme.Spacing.xxs) {
+                Image(systemName: icon)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(LensNoteTheme.Colors.accentCyan)
+                Text(title)
+                    .font(LensNoteTheme.Typography.chipLabel)
+                    .foregroundStyle(LensNoteTheme.Colors.textPrimary)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, LensNoteTheme.Spacing.xs)
+            .background(LensNoteTheme.Colors.surface.opacity(0.55))
+            .background(.ultraThinMaterial)
+            .clipShape(Capsule())
+            .overlay(
+                Capsule()
+                    .strokeBorder(LensNoteTheme.Colors.chipBorder, lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(title)
     }
 
     // MARK: - Camera Status Banner
@@ -632,7 +675,7 @@ private struct CameraLiveStepPreviewWrapper: View {
             recommendation: recommendation,
             tips: tips,
             activeGuidanceHint: activeGuidanceHint,
-            onBack: {},
+            onExit: {},
             onToggleGrid: { showGrid.toggle() },
             onCapture: {}
         )
