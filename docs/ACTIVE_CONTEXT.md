@@ -461,15 +461,26 @@ tasks.md task 5(5.1) 체크. Build: ✅ / Test: ✅ 20 passed.
 - Req 3.5: PHPicker는 out-of-process라 사진 권한 불필요 → 거부 시나리오 없음(게이트 불필요).
 tasks.md task 4(4.1) 체크. Build ✅ / Test ✅ 20.
 
+## Completed Work (2026-06-02 — Profile 탭 Req 5)
+
+"Coming soon" placeholder → 촬영 통계 화면. 1커밋.
+- `ProfileStatsCalculator`(순수 enum) `compute(from:) -> ProfileStats(totalPhotos/topShotStyle/topFilterPreset)`. 빈도 최다, 동률 시 최근 createdAt 우선, nil 제외.
+- `ProfileViewModel`(LoadState: loading/empty/loaded/failed) — `FetchPhotoPinsUseCase` 재사용해 PhotoItem 로드. 0건 empty(5.3)/실패 failed(5.6)/동기 2초내(5.7).
+- `ProfileView`: 총촬영/최다 스타일(`ShotStyle.koreanDescription`+`symbolName`)/최다 프리셋 stat 카드 + 빈 상태 + 에러 재시도. LensNoteTheme 토큰만(5.5), placeholder 제거(5.4).
+- `DIContainer.makeProfileViewModel()`, RootView `@StateObject profileVM`.
+- property 테스트 4건(9.2 Property 8): 랜덤 100회 불변식 + tie-break/nil/빈배열.
+tasks.md task 9(9.1/9.2) 체크. Build ✅ / Test ✅ 24.
+
 ## Next Recommended Tasks (in priority order)
 
-> **다음 세션 시작점**: Req 8/9 + Req 1 + Req 12 + Req 4 + Req 2 + Req 3 완료. 다음은 Profile 탭(Req 5).
+> **다음 세션 시작점**: Req 8/9 + Req 1 + Req 12 + Req 4 + Req 2 + Req 3 + Req 5 완료. 다음은 지도 필터(Req 6).
 > 진행 방침: 작업마다 커밋 분리.
 
-1. **Profile 탭 완성 (Req 5)** — `ProfileStatsCalculator`로 촬영 통계(총촬영/최다 ShotStyle/최다 Preset). PhotoItem 신규 필드(shotStyle/filterPresetName) 활용. 순수 함수라 property test 추가 가능(저위험).
-2. **지도 기간/지역 필터 (Req 6)** — `DateRangeFilter`(오늘/이번주/이번달/전체) + 칩 UI + 지역 필터. design.md Property 3(DateRangeFilter.includes) 테스트 대상.
-3. **런타임 영속성 통합 검증 (Req 8 잔여)** — camera → save → force-quit → relaunch → map pin 수동 QA.
-4. **face landmarks pitch 시뮬레이터 한계 모니터링 (Req 10)** — 실기기 pitch 가능성. 라이브 angle 코칭(Req 1)도 이 추정에 의존.
+1. **지도 기간/지역 필터 (Req 6)** — `DateRangeFilter`(오늘/이번주/이번달/전체) + 칩 UI + 지역 필터. design.md Property 3(`DateRangeFilter.includes(_:now:calendar:)`) 테스트 대상. 순수 함수 부분은 저위험.
+2. **런타임 영속성 통합 검증 (Req 8 잔여)** — camera → save → force-quit → relaunch → map pin 수동 QA.
+3. **face landmarks pitch 시뮬레이터 한계 모니터링 (Req 10)** — 실기기 pitch 가능성. 라이브 angle 코칭(Req 1)도 이 추정에 의존.
+
+남은 Kiro 태스크: Req 6(지도 필터), Req 10(pitch 안전성), Req 13(달성도 지표), 체크포인트(task 2/6/10/14).
 
 > ⚠️ **라이브 코칭 실기기 검증 잔여 (Req 1)**: 라이브 경로엔 face landmark가 없어 `cameraAngle`은 항상 nil → 현재 coverage 코칭("더 멀리/더 가까이")만 실제 동작. 앵글 코칭은 live ShotRecipe에 앵글이 추정되어야 동작(Req 10 pitch 연동 필요). 코칭 배너 체감/임계값(0.15)은 실기기에서 튜닝 필요.
 

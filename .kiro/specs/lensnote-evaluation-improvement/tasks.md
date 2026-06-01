@@ -150,8 +150,8 @@
     - **Validates: Requirements 6.7**
     - 랜덤 좌표 핀 + 랜덤 MKCoordinateRegion으로 100회 반복 검증
 
-- [ ] 9. Profile 탭 완성
-  - [ ] 9.1 ProfileStatsCalculator 및 ProfileView 구현
+- [x] 9. Profile 탭 완성
+  - [x] 9.1 ProfileStatsCalculator 및 ProfileView 구현
     - `Features/Profile/ProfileStatsCalculator.swift` 생성
     - `ProfileStats` struct 정의 (totalPhotos, topShotStyle, topFilterPreset)
     - `ProfileStatsCalculator.compute(from:)` 순수 함수 구현 (동률 시 최근 촬영 기준)
@@ -164,7 +164,7 @@
     - 2초 이내 데이터 로드
     - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7_
 
-  - [ ]* 9.2 Write property test for ProfileStatsCalculator
+  - [x]* 9.2 Write property test for ProfileStatsCalculator
     - **Property 8: Profile statistics computation**
     - **Validates: Requirements 5.1**
     - 랜덤 PhotoItem 배열로 100회 반복 검증 (totalPhotos, topShotStyle, topFilterPreset)
