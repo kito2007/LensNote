@@ -11,10 +11,21 @@
 		4CE77BF12F83E10800196678 /* MobileNetV2.mlmodel in Sources */ = {isa = PBXBuildFile; fileRef = 4CE77BEF2F83E10800196678 /* MobileNetV2.mlmodel */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		AA00000000000000000000B2 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 4C4FB6F52EF3CA10007AB71A /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 4C4FB6FC2EF3CA10007AB71A;
+			remoteInfo = LensNote;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
 		4C4FB6FD2EF3CA10007AB71A /* LensNote.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LensNote.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		4CE77BEE2F83E10800196678 /* DeepLabV3.mlmodel */ = {isa = PBXFileReference; lastKnownFileType = file.mlmodel; path = DeepLabV3.mlmodel; sourceTree = "<group>"; };
 		4CE77BEF2F83E10800196678 /* MobileNetV2.mlmodel */ = {isa = PBXFileReference; lastKnownFileType = file.mlmodel; path = MobileNetV2.mlmodel; sourceTree = "<group>"; };
+		AA00000000000000000000A2 /* LensNoteTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = LensNoteTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -23,10 +34,22 @@
 			path = LensNote;
 			sourceTree = "<group>";
 		};
+		AA00000000000000000000A6 /* LensNoteTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = LensNoteTests;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		4C4FB6FA2EF3CA10007AB71A /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AA00000000000000000000A4 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -40,6 +63,7 @@
 			isa = PBXGroup;
 			children = (
 				4C4FB6FF2EF3CA10007AB71A /* LensNote */,
+				AA00000000000000000000A6 /* LensNoteTests */,
 				4C4FB6FE2EF3CA10007AB71A /* Products */,
 				4CE77BEE2F83E10800196678 /* DeepLabV3.mlmodel */,
 				4CE77BEF2F83E10800196678 /* MobileNetV2.mlmodel */,
@@ -50,6 +74,7 @@
 			isa = PBXGroup;
 			children = (
 				4C4FB6FD2EF3CA10007AB71A /* LensNote.app */,
+				AA00000000000000000000A2 /* LensNoteTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -79,6 +104,29 @@
 			productReference = 4C4FB6FD2EF3CA10007AB71A /* LensNote.app */;
 			productType = "com.apple.product-type.application";
 		};
+		AA00000000000000000000A1 /* LensNoteTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AA00000000000000000000A7 /* Build configuration list for PBXNativeTarget "LensNoteTests" */;
+			buildPhases = (
+				AA00000000000000000000A3 /* Sources */,
+				AA00000000000000000000A4 /* Frameworks */,
+				AA00000000000000000000A5 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				AA00000000000000000000B1 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				AA00000000000000000000A6 /* LensNoteTests */,
+			);
+			name = LensNoteTests;
+			packageProductDependencies = (
+			);
+			productName = LensNoteTests;
+			productReference = AA00000000000000000000A2 /* LensNoteTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -91,6 +139,10 @@
 				TargetAttributes = {
 					4C4FB6FC2EF3CA10007AB71A = {
 						CreatedOnToolsVersion = 26.1.1;
+					};
+					AA00000000000000000000A1 = {
+						CreatedOnToolsVersion = 26.1.1;
+						TestTargetID = 4C4FB6FC2EF3CA10007AB71A;
 					};
 				};
 			};
@@ -109,12 +161,20 @@
 			projectRoot = "";
 			targets = (
 				4C4FB6FC2EF3CA10007AB71A /* LensNote */,
+				AA00000000000000000000A1 /* LensNoteTests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		4C4FB6FB2EF3CA10007AB71A /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AA00000000000000000000A5 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -133,7 +193,22 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		AA00000000000000000000A3 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		AA00000000000000000000B1 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 4C4FB6FC2EF3CA10007AB71A /* LensNote */;
+			targetProxy = AA00000000000000000000B2 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		4C4FB7062EF3CA12007AB71A /* Debug */ = {
@@ -327,6 +402,48 @@
 			};
 			name = Release;
 		};
+		AA00000000000000000000A8 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = BPWZJXAK5Q;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.1;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.PTY.LensNoteTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/LensNote.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/LensNote";
+			};
+			name = Debug;
+		};
+		AA00000000000000000000A9 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = BPWZJXAK5Q;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.1;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.PTY.LensNoteTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/LensNote.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/LensNote";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -344,6 +461,15 @@
 			buildConfigurations = (
 				4C4FB7092EF3CA12007AB71A /* Debug */,
 				4C4FB70A2EF3CA12007AB71A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		AA00000000000000000000A7 /* Build configuration list for PBXNativeTarget "LensNoteTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AA00000000000000000000A8 /* Debug */,
+				AA00000000000000000000A9 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

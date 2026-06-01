@@ -110,7 +110,7 @@ final class ShotRecipeAnalyzer {
         }
 
         // 단계 E — ShotStyle 라벨링
-        let (detectedStyle, styleConfidence) = classifyStyle(
+        let (detectedStyle, styleConfidence) = Self.classifyStyle(
             cameraAngle: cameraAngle,
             gazeDirection: gazeDirection,
             subjectCoverage: subjectCoverage,
@@ -231,7 +231,8 @@ final class ShotRecipeAnalyzer {
 
     // MARK: - Step E: ShotStyle classification
 
-    private func classifyStyle(
+    /// ShotStyle 라벨링 룰. 상태 없는 순수 함수 — 단위 테스트에서 직접 호출 가능하도록 static/internal.
+    static func classifyStyle(
         cameraAngle: CameraAngle?,
         gazeDirection: GazeDirection?,
         subjectCoverage: Double?,

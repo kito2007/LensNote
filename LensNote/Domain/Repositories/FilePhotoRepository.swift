@@ -23,15 +23,18 @@ final class FilePhotoRepository: PhotoRepositoryProtocol {
 
     // MARK: - Private
 
-    private let fileURL: URL = {
-        FileManager.default
-            .urls(for: .documentDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("photo_items.json")
-    }()
-
+    private let fileURL: URL
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
     private let log = Logger(subsystem: "com.PTY.LensNote", category: "FilePhotoRepository")
+
+    /// - Parameter fileURL: 저장 경로. 기본값은 앱 Documents 디렉토리의 photo_items.json.
+    ///   테스트에서 임시 경로를 주입해 격리할 수 있도록 노출한다.
+    init(fileURL: URL? = nil) {
+        self.fileURL = fileURL ?? FileManager.default
+            .urls(for: .documentDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("photo_items.json")
+    }
 
     // MARK: - PhotoRepositoryProtocol
 
