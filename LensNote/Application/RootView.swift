@@ -13,12 +13,14 @@ struct RootView: View {
     let cameraVM: CameraViewModel
     let container: DIContainer
     @StateObject private var mapVM: MapViewModel
+    @StateObject private var profileVM: ProfileViewModel
     @State private var selectedTab: AppTab = .home
 
     init(cameraVM: CameraViewModel, container: DIContainer) {
         self.cameraVM = cameraVM
         self.container = container
         _mapVM = StateObject(wrappedValue: container.makeMapViewModel())
+        _profileVM = StateObject(wrappedValue: container.makeProfileViewModel())
     }
 
     /// dock을 숨겨야 하면 true.
@@ -65,7 +67,7 @@ struct RootView: View {
                 })
                     .tag(AppTab.map)
 
-                ProfileView()
+                ProfileView(viewModel: profileVM)
                     .tag(AppTab.profile)
             }
             .ignoresSafeArea(edges: .bottom)

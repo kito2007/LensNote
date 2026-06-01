@@ -30,4 +30,9 @@ final class DIContainer {
         let fetchUseCase = FetchPhotoPinsUseCase(repository: photoRepository)
         return MapViewModel(fetchPhotoPinsUseCase: fetchUseCase)
     }
+
+    /// Profile 탭 ViewModel 팩토리 — 저장된 PhotoItem으로 촬영 통계를 계산한다(Req 5).
+    func makeProfileViewModel() -> ProfileViewModel {
+        ProfileViewModel(fetchUseCase: FetchPhotoPinsUseCase(repository: photoRepository))
+    }
 }
