@@ -49,6 +49,7 @@ struct MapView: View {
                             Annotation(pin.title, coordinate: pin.coordinate) {
                                 PinAnnotationView(selected: selection == pin.id, source: pin.source)
                                     .onTapGesture { selection = pin.id }
+                                    .accessibilityIdentifier("map.pin.\(pin.id)")
                             }
                             .tag(pin.id)
                         case .cluster(let center, let pins):

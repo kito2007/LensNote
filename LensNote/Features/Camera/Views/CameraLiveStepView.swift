@@ -153,6 +153,7 @@ struct CameraLiveStepView: View {
         .padding(.horizontal, LensNoteTheme.Spacing.xl)
         .accessibilityLabel("구도 안내")
         .accessibilityValue(text)
+        .accessibilityIdentifier("camera.guidance_banner")
     }
 
     // MARK: - Top Bar
@@ -251,7 +252,7 @@ struct CameraLiveStepView: View {
             // Left: Map shortcut
             VStack {
                 Spacer()
-                sideButton(icon: "map")
+                sideButton(icon: "map", identifier: "camera.side_map")
                     .padding(.bottom, 120)
             }
             .padding(.leading, LensNoteTheme.Spacing.xxs)
@@ -261,14 +262,14 @@ struct CameraLiveStepView: View {
             // Right: Photo library shortcut
             VStack {
                 Spacer()
-                sideButton(icon: "photo.on.rectangle")
+                sideButton(icon: "photo.on.rectangle", identifier: "camera.side_gallery")
                     .padding(.bottom, 120)
             }
             .padding(.trailing, LensNoteTheme.Spacing.xxs)
         }
     }
 
-    private func sideButton(icon: String) -> some View {
+    private func sideButton(icon: String, identifier: String) -> some View {
         Button(action: {}) {
             Image(systemName: icon)
                 .font(.system(size: 20))
@@ -280,6 +281,7 @@ struct CameraLiveStepView: View {
                 .shadow(color: LensNoteTheme.Shadow.elevated, radius: 12, y: 4)
         }
         .buttonStyle(.plain)
+        .accessibilityIdentifier(identifier)
     }
 
     // MARK: - Bottom Capture Bar
@@ -359,6 +361,7 @@ struct CameraLiveStepView: View {
             .disabled(isCapturingPhoto)
             .opacity(isCapturingPhoto ? 0.6 : 1)
             .accessibilityLabel("촬영")
+            .accessibilityIdentifier("camera.shutter")
         }
     }
 
@@ -373,6 +376,7 @@ struct CameraLiveStepView: View {
                 .shadow(color: LensNoteTheme.Shadow.elevated, radius: 12, y: 4)
         }
         .buttonStyle(.plain)
+        .accessibilityIdentifier("camera.ai_magic")
     }
 
     // MARK: - Inline Setup Toolbar (Req 12)
@@ -380,13 +384,13 @@ struct CameraLiveStepView: View {
     /// 라이브 뷰 안에서 레퍼런스/컨셉/수동 설정을 여는 인라인 진입점.
     private var setupToolbar: some View {
         HStack(spacing: LensNoteTheme.Spacing.xs) {
-            setupButton(icon: "photo.on.rectangle", title: "레퍼런스", action: onTapReference)
-            setupButton(icon: "sparkles", title: "컨셉", action: onTapConcept)
-            setupButton(icon: "slider.horizontal.3", title: "수동", action: onTapManual)
+            setupButton(icon: "photo.on.rectangle", title: "레퍼런스", identifier: "camera.select_reference", action: onTapReference)
+            setupButton(icon: "sparkles", title: "컨셉", identifier: "camera.select_concept", action: onTapConcept)
+            setupButton(icon: "slider.horizontal.3", title: "수동", identifier: "camera.select_manual", action: onTapManual)
         }
     }
 
-    private func setupButton(icon: String, title: String, action: @escaping () -> Void) -> some View {
+    private func setupButton(icon: String, title: String, identifier: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: LensNoteTheme.Spacing.xxs) {
                 Image(systemName: icon)
@@ -408,6 +412,7 @@ struct CameraLiveStepView: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(title)
+        .accessibilityIdentifier(identifier)
     }
 
     // MARK: - Camera Status Banner

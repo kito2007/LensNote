@@ -80,6 +80,7 @@ struct FloatingDockBar: View {
         }
         .buttonStyle(.plain)
         .frame(maxWidth: .infinity)
+        .accessibilityIdentifier("dock.tab.camera")
     }
 
     // MARK: - Regular Button
@@ -117,6 +118,7 @@ struct FloatingDockBar: View {
             .padding(.bottom, 8)
         }
         .buttonStyle(.plain)
+        .accessibilityIdentifier("dock.tab.\(tab.identifierKey)")
     }
 }
 

@@ -28,4 +28,14 @@ enum AppTab: Hashable, CaseIterable {
         case .profile: return "person.fill"
         }
     }
+
+    /// UI 자동화용 안정 식별자 키 (Req 4). dock 탭: "dock.tab.\(key)".
+    var identifierKey: String {
+        switch self {
+        case .home:    return "home"
+        case .camera:  return "camera"
+        case .map:     return "map"
+        case .profile: return "profile"
+        }
+    }
 }
