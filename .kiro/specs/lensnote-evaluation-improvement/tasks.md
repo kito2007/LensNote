@@ -97,8 +97,8 @@
 - [ ] 6. Checkpoint — 빌드 및 카메라 플로우 확인
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 7. FilePhotoRepository 스키마 버전 및 영속성 강화
-  - [ ] 7.1 PhotoStorageEnvelope 도입 및 마이그레이션 로직 구현
+- [~] 7. FilePhotoRepository 스키마 버전 및 영속성 강화
+  - [x] 7.1 PhotoStorageEnvelope 도입 및 마이그레이션 로직 구현 — Done 2026-06-01 (커밋 f1a6b08)
     - `PhotoStorageEnvelope` struct 정의 (schemaVersion: Int, items: [PhotoItem])
     - `currentVersion = 1` 상수 정의
     - 저장 시 schemaVersion 필드를 JSON 최상위에 포함
@@ -172,8 +172,8 @@
 - [ ] 10. Checkpoint — 빌드 및 전체 기능 확인
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 11. 자동화 테스트 기반 구축
-  - [ ] 11.1 단위 테스트 타겟 생성 및 핵심 도메인 테스트 작성
+- [~] 11. 자동화 테스트 기반 구축
+  - [x] 11.1 단위 테스트 타겟 생성 및 핵심 도메인 테스트 작성 — Done 2026-06-01 (커밋 20a0675, 13 tests pass)
     - Xcode 테스트 타겟 생성 (LensNoteTests)
     - AIInferenceAggregator.aggregate 테스트 3개: (a) 0/0→0.0, (b) 1.0/1.0→1.0, (c) nil/nil→기본값
     - ShotRecipeAnalyzer ShotStyle 라벨링 테스트 4개: aerialSelfie, mirrorSelfie, landscape, unknown 각 조건

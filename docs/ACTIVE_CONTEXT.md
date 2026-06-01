@@ -24,6 +24,9 @@ The project has:
 - **FloatingDockBar 가시성 — 카메라 sub-step 단위 제어 (selection만 dock 유지, 나머지 숨김)** (2026-05-09)
 - **wideSelfie 신설 + cameraAngle fallback 보완 — 광각 셀피(coverage 10~40% 영역) 자동 라벨링** (2026-05-09)
 - **ShotStyle 룰셋 미세 튜닝 + 한국어 조사 helper — 39장 CLI 일괄 검증 기반** (2026-05-09)
+- **Kiro 평가 개선 스펙 도입 — `.kiro/specs/lensnote-evaluation-improvement` (12 요구사항)** (2026-06-01)
+- **영속성 스키마 버전 + 마이그레이션 — PhotoStorageEnvelope / schemaVersion / os.Logger (Req 8)** (2026-06-01)
+- **단위 테스트 타겟(LensNoteTests) 신설 + 핵심 도메인 테스트 13건 통과 (Req 9)** (2026-06-01)
 
 ## Current High-Level Goal
 
@@ -383,16 +386,40 @@ Build: ✅ BUILD SUCCEEDED (iPhone 17 Pro Simulator, iOS 26.4.1).
 
 Build: ✅ BUILD SUCCEEDED (iPhone 17 Pro Simulator, iOS 26.4.1).
 
+## Completed Work (2026-06-01 — Kiro 스펙 기반 저위험 작업)
+
+Kiro AI가 작성한 평가/개선 스펙(`.kiro/specs/lensnote-evaluation-improvement`)을 도입하고, 그중 리스크 낮은 기술 기반 작업 2건을 우선 완료. 방향성: 카메라 UX는 사용자에게 불필요한 단계 제거(Req 12 플로우 간소화) — 다음 작업.
+
+1. **Kiro 스펙 도입 (커밋 4b573c8)**
+   - requirements.md(12 요구사항, EARS) / design.md(8 correctness property) / tasks.md(14 태스크 + wave 그래프).
+   - 코드가 스펙 작성 시점보다 앞서 있음: **Req 7(MapView 분리)은 이미 완료** — `Features/Map/Views/`에 PinAnnotationView/ClusterBadgeView/SidePanelList/PinCardView/PermissionOverlayView/MapEmptyStateView/PinThumbnailView 분리됨, MapView.swift 300줄.
+
+2. **영속성 스키마 버전 + 마이그레이션 (Req 8, 커밋 f1a6b08)**
+   - `PhotoStorageEnvelope { schemaVersion: Int; items: [PhotoItem] }`, currentVersion=1. 저장 시 최상위에 schemaVersion 기록.
+   - `FilePhotoRepository.fetchAll()`: envelope 디코딩 → 버전 검사. 구버전 bare array(v0) 자동 마이그레이션. 디코딩 실패/미래 버전은 빈 배열 + `os.Logger` 에러 (throw 대신 graceful fallback). **fetchAll이 non-throwing으로 변경**됨(프로토콜은 throws 유지, 비-throwing 오버라이드).
+   - `PhotoItem`에 `shotStyle: ShotStyle?`, `filterPresetName: String?` 추가(optional → 구버전 JSON 디코딩 호환). 메모버와이즈 init 명시.
+   - `SavePhotoUseCase.execute`에 shotStyle/filterPresetName 파라미터(기본 nil). `CameraViewModel.saveCapturedImage`가 적용된 preset 이름 기록.
+
+3. **단위 테스트 타겟 + 도메인 테스트 (Req 9, 커밋 20a0675)**
+   - `LensNoteTests` 유닛 테스트 타겟 신설 (xcodeproj objectVersion 77 수동 편집 + 공유 스킴 `LensNote.xcscheme` TestAction). PBXFileSystemSynchronizedRootGroup이라 `LensNoteTests/` 폴더 파일 자동 포함.
+   - swift-testing 13개 테스트(4 suite): AIInferenceAggregator(0/0, 1/1, nil/nil) · ShotRecipeAnalyzer.classifyStyle(aerial/mirror/landscape/unknown) · FilterPreset.forConcept(매핑/빈/미매핑) · FilePhotoRepository(라운드트립/빈상태/구버전 마이그레이션).
+   - 테스트 seam 2건: `ShotRecipeAnalyzer.classifyStyle` private→static internal, `FilePhotoRepository.init(fileURL:)` 주입.
+
+Build: ✅ BUILD SUCCEEDED / Test: ✅ 13 tests passed (iPhone 17 Pro Simulator).
+
 ## Next Recommended Tasks (in priority order)
 
-> **다음 세션 시작점**: 아래 1번부터 시작.
+> **다음 세션 시작점**: Kiro 스펙 진행 — 리스크 낮은 기술 기반(Req 8/9) 완료. 다음은 기능/UX.
+> 진행 방침: 작업마다 커밋 분리. 카메라 UX는 사용자에게 불필요한 단계 제거(Req 12 플로우 간소화).
 
-1. **라이브 코칭 (후속)** — 레퍼런스 ShotRecipe ↔ 라이브 프레임 ShotRecipe 비교해서 델타 코칭("팔 더 뻗으세요" 류). 이미 추출되는 ShotRecipe를 라이브 프레임에서도 추출해 비교.
-2. **Vision LLM 자문 (그 다음 후속)** — 레퍼런스 이미지를 멀티모달 모델에 넘겨 자연어 코칭. 네트워크 의존.
-3. **Capture result feedback 강화** (backlog P1) — 저장 완료 토스트 이상의 후반 플로우 디자인.
-4. **Accessibility identifiers** (backlog P1) — XcodeBuildMCP 자동화를 위한 안정적인 식별자 추가.
-5. **Runtime validation** — camera → capture → save → force-quit → relaunch → map pin 확인 (수동 QA).
-6. **face landmarks pitch 시뮬레이터 한계 모니터링** — 실기기에서는 pitch 잡힐 가능성. 시뮬레이터 의존 시 cameraAngle midY fallback에만 기댐.
+1. **라이브 코칭 (Req 1)** — `LiveCoachingEngine` 신설. 레퍼런스 ShotRecipe ↔ 라이브 프레임 ShotRecipe 비교 델타 코칭("더 멀리/더 가까이", 앵글 보정). coverageThreshold 0.15, 디바운스 0.9s/1.6s 재사용. PhotoItem.shotStyle 저장 연결도 이 흐름에서.
+2. **카메라 진입 플로우 간소화 (Req 12)** — ⚠️ 영향 범위 큼. `CameraSelectionStepView` 제거, 진입 즉시 `.camera`. **현재 dock 가시성이 `step != .select` 기준이라 RootView.shouldHideDock + CameraView onChange 동시 수정 필요**. 레퍼런스/컨셉/수동을 라이브 뷰 인라인/시트로 통합.
+3. **캡처 결과 피드백 강화 (Req 2)** — 위치명(역지오코딩 3s 타임아웃)/프리셋/ShotStyle 결과 카드 + "지도에서 보기".
+4. **카메라 사이드 버튼 연결 (Req 3)** + **접근성 식별자 (Req 4)** — 사이드 버튼 no-op 해소, `camera.*`/`map.pin.*`/`dock.tab.*` 식별자.
+5. **Profile 탭 완성 (Req 5)** — `ProfileStatsCalculator`로 촬영 통계(총촬영/최다 ShotStyle/최다 Preset). PhotoItem 신규 필드 활용.
+6. **지도 기간/지역 필터 (Req 6)** — `DateRangeFilter`(오늘/이번주/이번달/전체) + 칩 UI + 지역 필터.
+7. **런타임 영속성 통합 검증 (Req 8 잔여)** — camera → save → force-quit → relaunch → map pin 수동 QA.
+8. **face landmarks pitch 시뮬레이터 한계 모니터링 (Req 10)** — 실기기 pitch 가능성. 시뮬레이터 의존 시 cameraAngle midY fallback.
 
 ## Verification Status
 
@@ -416,8 +443,10 @@ Build: ✅ BUILD SUCCEEDED (iPhone 17 Pro Simulator, iOS 26.4.1).
 - **FloatingDockBar sub-step 가시성 제어: build-verified** (`BUILD SUCCEEDED`, iPhone 17 Pro Simulator, iOS 26.4.1) — 실기기 tap-through 확인은 다음 세션
 - **wideSelfie + cameraAngle fallback: build-verified** (`BUILD SUCCEEDED`) — 실기기 정면/광각 셀피 → wideSelfie 라벨링 확인됨 (사용자 보고)
 - **룰셋 미세 튜닝 + 한국어 조사: build-verified** (`BUILD SUCCEEDED`) — 39장 swift CLI 일괄 검증으로 unknown 8장 모두 의미 있는 라벨로 분류 확인. 실기기 재검증은 다음 세션
+- **영속성 스키마 버전 + 마이그레이션 (Req 8): build-verified + 단위 테스트 검증** — 라운드트립/구버전 마이그레이션 테스트 통과. 실기기 force-quit→relaunch 런타임 검증은 미완료(Req 8 통합 테스트)
+- **단위 테스트 타겟 (Req 9): test-verified** — `xcodebuild test` 13 tests passed (iPhone 17 Pro Simulator). swift-testing, 공유 스킴 TestAction 동작 확인
 - Branch state: main only
-- Last handoff: 2026-05-09
+- Last handoff: 2026-06-01
 
 ## Update Rule
 
