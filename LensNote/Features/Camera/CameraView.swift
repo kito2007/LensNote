@@ -41,9 +41,13 @@ struct CameraView: View {
     private let onExit: () -> Void
     /// 결과 카드의 "지도에서 보기" — 저장된 PhotoItem id를 넘겨 지도 탭으로 이동 + 해당 핀 선택 (Req 2.2).
     private let onNavigateToMap: (UUID) -> Void
+    /// 라이브 뷰 사이드 지도 버튼 — 지도 탭으로 전환(핀 선택 없음) (Req 3.1).
+    private let onOpenMap: () -> Void
 
     @State private var step: CameraInputMode = .camera
     @State private var activeSetupSheet: CameraSetupSheet? = nil
+    /// 갤러리 사이드 버튼으로 직접 띄우는 사진 피커 표시 여부 (Req 3.2).
+    @State private var showGalleryPicker: Bool = false
     @State private var conceptInput: String = ""
     @State private var referencePickerItem: PhotosPickerItem?
     @State private var selectedReferenceImage: UIImage?
@@ -66,11 +70,13 @@ struct CameraView: View {
     init(
         viewModel: CameraViewModel,
         onExit: @escaping () -> Void = {},
-        onNavigateToMap: @escaping (UUID) -> Void = { _ in }
+        onNavigateToMap: @escaping (UUID) -> Void = { _ in },
+        onOpenMap: @escaping () -> Void = {}
     ) {
         _viewModel = StateObject(wrappedValue: viewModel)
         self.onExit = onExit
         self.onNavigateToMap = onNavigateToMap
+        self.onOpenMap = onOpenMap
     }
     
     var body: some View {
@@ -107,7 +113,9 @@ struct CameraView: View {
                     },
                     onTapReference: { activeSetupSheet = .reference },
                     onTapConcept: { activeSetupSheet = .concept },
-                    onTapManual: { activeSetupSheet = .manual }
+                    onTapManual: { activeSetupSheet = .manual },
+                    onMapTap: onOpenMap,
+                    onGalleryTap: { showGalleryPicker = true }
                 )
             case .result:
                 CameraCaptureResultStepView(
@@ -153,8 +161,12 @@ struct CameraView: View {
         }
         .onChange(of: referencePickerItem) { _, newItem in
             guard let newItem else { return }
+            // 갤러리 사이드 버튼으로 고른 경우(시트 미오픈) 레퍼런스 시트를 열어 분석을 보여준다 (Req 3.3).
+            if activeSetupSheet == nil { activeSetupSheet = .reference }
             Task { await loadReferenceImage(from: newItem) }
         }
+        // Req 3.2 — 갤러리 사이드 버튼: 시스템 사진 피커(PHPicker)를 직접 표시. 취소 시 라이브 뷰 유지(Req 3.4).
+        .photosPicker(isPresented: $showGalleryPicker, selection: $referencePickerItem, matching: .images)
         .sheet(item: $activeSetupSheet) { sheet in
             setupSheet(sheet)
         }

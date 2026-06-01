@@ -37,6 +37,9 @@ struct CameraLiveStepView: View {
     var onTapReference: () -> Void = {}
     var onTapConcept: () -> Void = {}
     var onTapManual: () -> Void = {}
+    /// 사이드 버튼 — 지도 탭 이동 / 갤러리(레퍼런스) 피커 (Req 3).
+    var onMapTap: () -> Void = {}
+    var onGalleryTap: () -> Void = {}
 
     var body: some View {
         ZStack {
@@ -252,7 +255,7 @@ struct CameraLiveStepView: View {
             // Left: Map shortcut
             VStack {
                 Spacer()
-                sideButton(icon: "map", identifier: "camera.side_map")
+                sideButton(icon: "map", identifier: "camera.side_map", action: onMapTap)
                     .padding(.bottom, 120)
             }
             .padding(.leading, LensNoteTheme.Spacing.xxs)
@@ -262,15 +265,15 @@ struct CameraLiveStepView: View {
             // Right: Photo library shortcut
             VStack {
                 Spacer()
-                sideButton(icon: "photo.on.rectangle", identifier: "camera.side_gallery")
+                sideButton(icon: "photo.on.rectangle", identifier: "camera.side_gallery", action: onGalleryTap)
                     .padding(.bottom, 120)
             }
             .padding(.trailing, LensNoteTheme.Spacing.xxs)
         }
     }
 
-    private func sideButton(icon: String, identifier: String) -> some View {
-        Button(action: {}) {
+    private func sideButton(icon: String, identifier: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
             Image(systemName: icon)
                 .font(.system(size: 20))
                 .foregroundStyle(LensNoteTheme.Colors.textPrimary)

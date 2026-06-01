@@ -48,6 +48,12 @@ struct RootView: View {
                         withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                             selectedTab = .map
                         }
+                    },
+                    onOpenMap: {
+                        // Req 3.1 — 라이브 뷰 사이드 지도 버튼: 지도 탭으로 전환(핀 선택 없음).
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                            selectedTab = .map
+                        }
                     }
                 )
                     .tag(AppTab.camera)
