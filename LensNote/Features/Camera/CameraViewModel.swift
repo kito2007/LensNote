@@ -259,6 +259,8 @@ final class CameraViewModel: NSObject, ObservableObject {
             let saved = try savePhotoUseCase.execute(
                 imagePath: filePath,
                 coordinate: resolvedCoordinate,
+                // Req 1/8 — 레퍼런스가 설정된 경우 그 ShotStyle을 촬영 메타데이터로 기록.
+                shotStyle: referenceRecipe?.detectedStyle,
                 filterPresetName: preset?.name
             )
             lastSaved = saved
