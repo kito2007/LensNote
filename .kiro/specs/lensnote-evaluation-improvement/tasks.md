@@ -38,8 +38,8 @@
 - [ ] 2. Checkpoint — 빌드 확인
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 3. LiveCoachingEngine 구현
-  - [ ] 3.1 LiveCoachingDelta 모델 및 LiveCoachingEngine 순수 함수 구현
+- [x] 3. LiveCoachingEngine 구현
+  - [x] 3.1 LiveCoachingDelta 모델 및 LiveCoachingEngine 순수 함수 구현
     - `Features/Camera/LiveCoachingEngine.swift` 생성
     - `LiveCoachingDelta` struct 정의 (coverageMessage, angleMessage, primaryMessage, isEmpty)
     - `LiveCoachingEngine.compare(reference:live:)` 구현
@@ -48,17 +48,17 @@
     - reference nil → nil 반환, coverage/angle nil → 해당 축 메시지 생략
     - _Requirements: 1.1, 1.2, 1.3, 1.5, 1.8_
 
-  - [ ]* 3.2 Write property test for LiveCoachingEngine coverage delta
+  - [x]* 3.2 Write property test for LiveCoachingEngine coverage delta
     - **Property 1: Coverage delta coaching message correctness**
     - **Validates: Requirements 1.2, 1.8**
     - 랜덤 Double(0...1) coverage 쌍으로 100회 반복 검증
 
-  - [ ]* 3.3 Write property test for no coaching without reference
+  - [x]* 3.3 Write property test for no coaching without reference
     - **Property 2: No coaching delta without reference**
     - **Validates: Requirements 1.5**
     - 랜덤 ShotRecipe + nil reference로 100회 반복 검증
 
-  - [ ] 3.4 CameraViewModel에 라이브 코칭 통합
+  - [x] 3.4 CameraViewModel에 라이브 코칭 통합
     - CameraViewModel에 `referenceShotRecipe: ShotRecipe?` 프로퍼티 추가
     - 라이브 프레임에서 ShotRecipe 추출 로직 추가 (기존 RealTimeInferenceEngine 결과 활용)
     - `LiveCoachingEngine.compare(reference:live:)` 호출하여 LiveCoachingDelta 생성
@@ -67,7 +67,7 @@
     - 레퍼런스 미설정 시 기존 Vision 기반 ActiveGuidanceHint만 표시
     - _Requirements: 1.1, 1.4, 1.5, 1.6, 1.7, 1.8_
 
-  - [ ] 3.5 CameraLiveStepView에 라이브 코칭 배너 UI 연결
+  - [x] 3.5 CameraLiveStepView에 라이브 코칭 배너 UI 연결
     - 기존 guidanceBanner와 동일한 글래스 캡슐 UI로 LiveCoachingDelta 메시지 표시
     - `liveCoachingMessage` 프로퍼티 추가 및 CameraView에서 전달
     - _Requirements: 1.4_

@@ -407,19 +407,37 @@ Kiro AI가 작성한 평가/개선 스펙(`.kiro/specs/lensnote-evaluation-impro
 
 Build: ✅ BUILD SUCCEEDED / Test: ✅ 13 tests passed (iPhone 17 Pro Simulator).
 
+## Completed Work (2026-06-01 — 라이브 코칭 Req 1)
+
+레퍼런스 ShotRecipe ↔ 라이브 프레임 비교 델타 코칭 구현. 3개 커밋 분리.
+
+1. **LiveCoachingEngine (커밋 935aa6f)** — 순수 함수 `enum`. `compare(reference:live:) -> LiveCoachingDelta?`.
+   - coverage: `(live - ref) >= +0.15` "더 멀리", `<= -0.15` "더 가까이". `coverageThreshold = 0.15`.
+   - cameraAngle 보정(현재→목표): highAngle→eyeLevel "내려주세요", lowAngle→eyeLevel "올려주세요", eyeLevel→highAngle "위로 올려주세요", eyeLevel→lowAngle "아래로 내려주세요" + high↔low 2쌍. 물리적 UX 방향(현재 앵글을 목표로 보정)으로 해석, 코드 주석 명시.
+   - reference nil → 전체 nil(Req 1.5), 각 축 nil이면 해당 메시지 생략(Req 1.8).
+   - `LiveCoachingDelta { coverageMessage, angleMessage, primaryMessage(coverage 우선), isEmpty }`.
+   - property 테스트 7건(`LensNoteTests/LiveCoachingEngineTests`): Property 1 coverage 정확성(100회), Property 2 레퍼런스 없음(100회), 임계 컷오프, 앵글 매핑/동일/nil.
+2. **CameraViewModel 통합 (커밋 2da4e16)** — `referenceRecipe`(@Published) + `setReferenceRecipe(_:)`. `applyInferenceOutput`이 라이브 추론(`AIInferenceOutput.subjectCoverage`/`subjectBoundingBox`)을 ShotRecipe로 환산 → `compare` → `coachingMessage`. `updateActiveGuidanceHint`에서 `primaryHint = coachingMessage ?? coreMLGuidanceHint`로 기존 0.9s/1.6s 디바운스를 그대로 통과해 **기존 글래스 배너 재사용**(별도 프로퍼티 안 만듦 → task 3.5도 충족). CameraView 레퍼런스 onConfirm에서 set, 컨셉/수동/reset에서 nil로 코칭 범위 한정.
+   - ⚠️ **라이브 경로에 face landmark 없음 → live `cameraAngle` 항상 nil → 실제로는 coverage 코칭만 동작**(앵글 코칭은 Req 10 pitch 연동 필요).
+3. **저장 ShotStyle 연결 (커밋 f2108e5)** — `saveCapturedImage`가 `referenceRecipe?.detectedStyle`을 `SavePhotoUseCase.execute(shotStyle:)`로 전달 → `PhotoItem.shotStyle` 영속화.
+
+tasks.md task 3(3.1~3.5) 전체 체크 완료.
+Build: ✅ BUILD SUCCEEDED / Test: ✅ 20 tests passed (iPhone 17 Pro Simulator). 실기기 코칭 체감/임계값 튜닝은 다음 세션.
+
 ## Next Recommended Tasks (in priority order)
 
-> **다음 세션 시작점**: Kiro 스펙 진행 — 리스크 낮은 기술 기반(Req 8/9) 완료. 다음은 기능/UX.
+> **다음 세션 시작점**: Kiro 스펙 진행 — Req 8/9(기술 기반) + Req 1(라이브 코칭) 완료. 다음은 카메라 UX 간소화(Req 12).
 > 진행 방침: 작업마다 커밋 분리. 카메라 UX는 사용자에게 불필요한 단계 제거(Req 12 플로우 간소화).
 
-1. **라이브 코칭 (Req 1)** — `LiveCoachingEngine` 신설. 레퍼런스 ShotRecipe ↔ 라이브 프레임 ShotRecipe 비교 델타 코칭("더 멀리/더 가까이", 앵글 보정). coverageThreshold 0.15, 디바운스 0.9s/1.6s 재사용. PhotoItem.shotStyle 저장 연결도 이 흐름에서.
-2. **카메라 진입 플로우 간소화 (Req 12)** — ⚠️ 영향 범위 큼. `CameraSelectionStepView` 제거, 진입 즉시 `.camera`. **현재 dock 가시성이 `step != .select` 기준이라 RootView.shouldHideDock + CameraView onChange 동시 수정 필요**. 레퍼런스/컨셉/수동을 라이브 뷰 인라인/시트로 통합.
-3. **캡처 결과 피드백 강화 (Req 2)** — 위치명(역지오코딩 3s 타임아웃)/프리셋/ShotStyle 결과 카드 + "지도에서 보기".
-4. **카메라 사이드 버튼 연결 (Req 3)** + **접근성 식별자 (Req 4)** — 사이드 버튼 no-op 해소, `camera.*`/`map.pin.*`/`dock.tab.*` 식별자.
-5. **Profile 탭 완성 (Req 5)** — `ProfileStatsCalculator`로 촬영 통계(총촬영/최다 ShotStyle/최다 Preset). PhotoItem 신규 필드 활용.
-6. **지도 기간/지역 필터 (Req 6)** — `DateRangeFilter`(오늘/이번주/이번달/전체) + 칩 UI + 지역 필터.
-7. **런타임 영속성 통합 검증 (Req 8 잔여)** — camera → save → force-quit → relaunch → map pin 수동 QA.
-8. **face landmarks pitch 시뮬레이터 한계 모니터링 (Req 10)** — 실기기 pitch 가능성. 시뮬레이터 의존 시 cameraAngle midY fallback.
+1. **카메라 진입 플로우 간소화 (Req 12)** — ⚠️ 영향 범위 큼. `CameraSelectionStepView` 제거, 진입 즉시 `.camera`. **현재 dock 가시성이 `step != .select` 기준이라 RootView.shouldHideDock + CameraView onChange 동시 수정 필요**. 레퍼런스/컨셉/수동을 라이브 뷰 인라인/시트로 통합. ⚠️ 진입 경로별 `setReferenceRecipe(_:)` 호출(레퍼런스 코칭 범위 한정)이 인라인 전환 후에도 유지되도록 주의.
+2. **캡처 결과 피드백 강화 (Req 2)** — 위치명(역지오코딩 3s 타임아웃)/프리셋/ShotStyle 결과 카드 + "지도에서 보기". PhotoItem.shotStyle 이미 영속화됨(Req 1에서 연결).
+3. **카메라 사이드 버튼 연결 (Req 3)** + **접근성 식별자 (Req 4)** — 사이드 버튼 no-op 해소, `camera.*`/`map.pin.*`/`dock.tab.*` 식별자.
+4. **Profile 탭 완성 (Req 5)** — `ProfileStatsCalculator`로 촬영 통계(총촬영/최다 ShotStyle/최다 Preset). PhotoItem 신규 필드 활용.
+5. **지도 기간/지역 필터 (Req 6)** — `DateRangeFilter`(오늘/이번주/이번달/전체) + 칩 UI + 지역 필터.
+6. **런타임 영속성 통합 검증 (Req 8 잔여)** — camera → save → force-quit → relaunch → map pin 수동 QA.
+7. **face landmarks pitch 시뮬레이터 한계 모니터링 (Req 10)** — 실기기 pitch 가능성. 시뮬레이터 의존 시 cameraAngle midY fallback.
+
+> ⚠️ **라이브 코칭 실기기 검증 잔여 (Req 1)**: 라이브 경로엔 face landmark가 없어 `cameraAngle`은 항상 nil → 현재 coverage 코칭("더 멀리/더 가까이")만 실제 동작. 앵글 코칭은 live ShotRecipe에 앵글이 추정되어야 동작(Req 10 pitch 연동 필요). 코칭 배너 체감/임계값(0.15)은 실기기에서 튜닝 필요.
 
 ## Verification Status
 
