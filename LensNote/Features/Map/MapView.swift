@@ -178,6 +178,25 @@ struct MapView: View {
                         .transition(.opacity)
                 }
 
+                // Req 6.5 — 사진은 있지만 기간 필터 결과가 0건일 때 중앙 안내
+                if !viewModel.pins.isEmpty
+                    && viewModel.filteredPins.isEmpty
+                    && !viewModel.isLoading {
+                    filterEmptyState
+                        .transition(.opacity)
+                }
+
+                // Req 6.3 — 상단 기간 필터 칩 행
+                VStack(spacing: 0) {
+                    DateFilterChipRow(selected: viewModel.activeDateFilter) { filter in
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            viewModel.applyDateFilter(filter)
+                        }
+                    }
+                    .padding(.top, LensNoteTheme.Spacing.xs)
+                    Spacer()
+                }
+
                 // 보이는 핀이 있고 카드가 열려있지 않을 때만 패널 표시
                 if !visiblePins.isEmpty && viewModel.selectedPin == nil {
                     if isCompact {
@@ -209,25 +228,28 @@ struct MapView: View {
         }
     }
 
-    /// 현재 맵 영역에 보이는 핀만 필터링하고, 많을 경우 다운샘플링
-    private var visiblePins: [PhotoPin] {
-        guard let region = currentRegion else { return viewModel.pins }
-        let filtered = viewModel.pins.filter { isCoordinate($0.coordinate, in: region) }
-        return downsamplePins(filtered, in: region)
+    /// 기간 필터 결과가 0건일 때 지도 중앙에 표시하는 안내 (Req 6.5).
+    private var filterEmptyState: some View {
+        VStack(spacing: LensNoteTheme.Spacing.xs) {
+            Image(systemName: "calendar.badge.exclamationmark")
+                .font(.system(size: 40, weight: .light))
+                .foregroundStyle(LensNoteTheme.Colors.textTertiary)
+            Text("이 기간에 촬영된 사진이 없어요")
+                .font(LensNoteTheme.Typography.body)
+                .foregroundStyle(LensNoteTheme.Colors.textTertiary)
+        }
+        .padding(LensNoteTheme.Spacing.md)
+        .background(LensNoteTheme.Colors.surface.opacity(0.7))
+        .background(.ultraThinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: LensNoteTheme.Radius.card, style: .continuous))
     }
 
-    /// 좌표가 주어진 영역 박스 안에 포함되는지 판정
-    private func isCoordinate(_ coordinate: CLLocationCoordinate2D, in region: MKCoordinateRegion) -> Bool {
-        let halfLat = region.span.latitudeDelta / 2
-        let halfLon = region.span.longitudeDelta / 2
-        let latMin = region.center.latitude - halfLat
-        let latMax = region.center.latitude + halfLat
-        let lonMin = region.center.longitude - halfLon
-        let lonMax = region.center.longitude + halfLon
-        return coordinate.latitude >= latMin
-            && coordinate.latitude <= latMax
-            && coordinate.longitude >= lonMin
-            && coordinate.longitude <= lonMax
+    /// 기간 필터(Req 6.2) + 현재 맵 영역(Req 6.7)에 보이는 핀만 필터링하고, 많을 경우 다운샘플링.
+    private var visiblePins: [PhotoPin] {
+        let dateFiltered = viewModel.filteredPins
+        guard let region = currentRegion else { return dateFiltered }
+        let filtered = dateFiltered.filter { MapRegionFilter.contains($0.coordinate, in: region) }
+        return downsamplePins(filtered, in: region)
     }
 
     /// 핀이 너무 많을 때 격자 버킷으로 대표 핀만 남겨 UI 부하 감소
