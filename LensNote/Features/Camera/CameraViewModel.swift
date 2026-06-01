@@ -11,6 +11,7 @@ import Foundation
 import Combine
 import AVFoundation
 import UIKit
+import CoreLocation
 
 struct FilterPreset: Equatable {
     let name: String
@@ -97,6 +98,14 @@ final class CameraViewModel: NSObject, ObservableObject {
     @Published private(set) var referenceRecipe: ShotRecipe? = nil
     /// 직전 프레임의 라이브 코칭 메시지(원본, 디바운스 전). 레퍼런스 미설정 시 nil.
     private var coachingMessage: String? = nil
+
+    // MARK: - 캡처 결과 (Req 2)
+    /// 저장 완료된 촬영 결과. nil이면 결과 카드 대신 저장 전 확인 화면을 표시한다.
+    @Published private(set) var captureResult: CaptureResultInfo? = nil
+    /// 역지오코딩 타임아웃(초).
+    private let placeNameTimeout: TimeInterval = 3
+    private let resultGeocoder = CLGeocoder()
+    private var placeNameTask: Task<Void, Never>?
 
     let session = AVCaptureSession()
 
@@ -254,13 +263,14 @@ final class CameraViewModel: NSObject, ObservableObject {
     /// 위치 정보를 전혀 구할 수 없으면 위치 없이 저장하고 hasLocationWarning을 true로 설정한다.
     func saveCapturedImage(_ image: UIImage, coordinate: GeoCoordinate? = nil) {
         let resolvedCoordinate = coordinate ?? locationProvider.latestCoordinate
+        let shotStyle = referenceRecipe?.detectedStyle
         do {
             let filePath = try persistImageToDocuments(image)
             let saved = try savePhotoUseCase.execute(
                 imagePath: filePath,
                 coordinate: resolvedCoordinate,
                 // Req 1/8 — 레퍼런스가 설정된 경우 그 ShotStyle을 촬영 메타데이터로 기록.
-                shotStyle: referenceRecipe?.detectedStyle,
+                shotStyle: shotStyle,
                 filterPresetName: preset?.name
             )
             lastSaved = saved
@@ -268,8 +278,60 @@ final class CameraViewModel: NSObject, ObservableObject {
             if resolvedCoordinate == nil {
                 hasLocationWarning = true
             }
+            // Req 2 — 저장 성공 시 결과 카드 정보 구성 + 역지오코딩 시작.
+            captureResult = CaptureResultInfo(
+                photoID: saved.id,
+                thumbnail: image,
+                placeName: resolvedCoordinate == nil ? nil : "위치 확인 중…",
+                filterPresetName: preset?.name,
+                shotStyleLabel: shotStyle.map { $0.koreanDescription },
+                coordinate: resolvedCoordinate
+            )
+            startPlaceNameResolution(for: resolvedCoordinate)
         } catch {
             errorMessage = String(describing: error)
+        }
+    }
+
+    /// 결과 카드/저장 상태를 초기화한다(다시 찍기·새 촬영 시).
+    func clearCaptureResult() {
+        placeNameTask?.cancel()
+        placeNameTask = nil
+        captureResult = nil
+        errorMessage = nil
+    }
+
+    /// 좌표가 있으면 3초 타임아웃으로 역지오코딩하여 결과 카드의 위치명을 갱신한다(Req 2.1, 2.6).
+    private func startPlaceNameResolution(for coordinate: GeoCoordinate?) {
+        placeNameTask?.cancel()
+        guard let coordinate else { return }
+        let timeout = placeNameTimeout
+        placeNameTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            let resolved = await self.reverseGeocodeWithTimeout(coordinate, timeout: timeout)
+            guard !Task.isCancelled else { return }
+            // 이 결과가 현재 표시 중인 촬영의 것일 때만 반영.
+            guard self.captureResult?.coordinate == coordinate else { return }
+            self.captureResult?.placeName = resolved ?? "위치명을 불러올 수 없음"
+        }
+    }
+
+    /// CLGeocoder 역지오코딩에 타임아웃을 건다. 타임아웃/실패 시 nil.
+    private func reverseGeocodeWithTimeout(_ coordinate: GeoCoordinate, timeout: TimeInterval) async -> String? {
+        let location = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
+        return await withTaskGroup(of: String?.self) { group in
+            group.addTask { [resultGeocoder] in
+                let placemark = try? await resultGeocoder.reverseGeocodeLocation(location).first
+                return placemark?.name ?? placemark?.locality ?? placemark?.administrativeArea ?? placemark?.country
+            }
+            group.addTask {
+                try? await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
+                return nil
+            }
+            // 먼저 끝난 결과(지명 또는 타임아웃)를 채택하고 나머지는 취소.
+            let first = await group.next() ?? nil
+            group.cancelAll()
+            return first
         }
     }
 

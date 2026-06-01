@@ -274,7 +274,7 @@ struct ShotRecipeView: View {
 
 // MARK: - ShotStyle Display Helpers
 
-private extension ShotStyle {
+extension ShotStyle {
     var displayLabel: String {
         switch self {
         case .aerialSelfie:   return "AERIAL SELFIE"

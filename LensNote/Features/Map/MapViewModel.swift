@@ -32,6 +32,11 @@ final class MapViewModel: NSObject, ObservableObject {
     @Published var selectedPin: PhotoPin?
     @Published var permissionState: PermissionState = .unknown
     @Published var isLoading: Bool = false
+    /// 외부(카메라 결과 카드)에서 요청한 포커스 좌표. MapView가 카메라 이동에 사용 후 clearFocus()로 비운다 (Req 2.2).
+    @Published var focusCoordinate: GeoCoordinate?
+
+    /// 아직 핀이 로드되기 전이라 보류된 선택 요청 id.
+    private var pendingSelectionID: UUID?
 
     // MARK: - Private services & state
 
@@ -100,6 +105,9 @@ final class MapViewModel: NSObject, ObservableObject {
         // 기존 lensNote 핀을 교체하고 library 핀은 유지한다.
         let libraryPins = pins.filter { $0.source == .library }
         pins = newPins + libraryPins
+
+        // 보류된 선택 요청이 있으면 새 핀 집합에서 적용 시도.
+        applyPendingSelectionIfPossible()
     }
 
     // MARK: - Mock pins
@@ -208,6 +216,28 @@ final class MapViewModel: NSObject, ObservableObject {
     /// 핀 선택/해제하여 하단 카드 표시 제어
     func select(pin: PhotoPin) {
         selectedPin = pin
+    }
+
+    /// 카메라 결과 카드에서 저장된 사진의 핀을 선택 요청한다 (Req 2.2).
+    /// 방금 저장된 핀이 포함되도록 LensNote 핀을 갱신하고, 있으면 즉시 선택·포커스한다.
+    /// 아직 없으면(라이브러리 비동기 로드 전) 보류했다가 로드 완료 시 적용한다.
+    func requestSelection(id: UUID) {
+        pendingSelectionID = id
+        loadLensNotePins()
+        applyPendingSelectionIfPossible()
+    }
+
+    private func applyPendingSelectionIfPossible() {
+        guard let id = pendingSelectionID,
+              let pin = pins.first(where: { $0.id == id }) else { return }
+        pendingSelectionID = nil
+        selectedPin = pin
+        focusCoordinate = GeoCoordinate(latitude: pin.latitude, longitude: pin.longitude)
+    }
+
+    /// MapView가 포커스 좌표로 카메라를 이동한 뒤 호출하여 중복 이동을 막는다.
+    func clearFocus() {
+        focusCoordinate = nil
     }
 
     func closeCard() {

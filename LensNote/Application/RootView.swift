@@ -41,7 +41,14 @@ struct RootView: View {
 
                 CameraView(
                     viewModel: cameraVM,
-                    onExit: { selectedTab = .home }
+                    onExit: { selectedTab = .home },
+                    onNavigateToMap: { photoID in
+                        // Req 2.2 — 결과 카드 "지도에서 보기": 지도 탭으로 이동 + 해당 핀 선택.
+                        mapVM.requestSelection(id: photoID)
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                            selectedTab = .map
+                        }
+                    }
                 )
                     .tag(AppTab.camera)
 

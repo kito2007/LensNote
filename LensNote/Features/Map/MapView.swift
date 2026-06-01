@@ -132,6 +132,19 @@ struct MapView: View {
                         selection = newValue
                     }
                 }
+                // Req 2.2 — 카메라 결과 카드에서 요청한 핀으로 카메라 이동.
+                .onChange(of: viewModel.focusCoordinate) { _, coord in
+                    guard let coord else { return }
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+                        position = .region(
+                            MKCoordinateRegion(
+                                center: CLLocationCoordinate2D(latitude: coord.latitude, longitude: coord.longitude),
+                                span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
+                            )
+                        )
+                    }
+                    viewModel.clearFocus()
+                }
                 // 로딩 배너 표시
                 .safeAreaInset(edge: .top) {
                     if viewModel.isLoading {

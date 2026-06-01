@@ -39,6 +39,8 @@ struct CameraView: View {
     @StateObject private var viewModel: CameraViewModel
     /// 풀스크린 라이브 뷰에서 홈으로 복귀(dock이 없으므로 탭 전환 경로 제공) (Req 12).
     private let onExit: () -> Void
+    /// 결과 카드의 "지도에서 보기" — 저장된 PhotoItem id를 넘겨 지도 탭으로 이동 + 해당 핀 선택 (Req 2.2).
+    private let onNavigateToMap: (UUID) -> Void
 
     @State private var step: CameraInputMode = .camera
     @State private var activeSetupSheet: CameraSetupSheet? = nil
@@ -58,16 +60,17 @@ struct CameraView: View {
     @State private var referenceImageData: Data? = nil
     @State private var referenceGeneratedRecipe: ShotRecipe? = nil
     @State private var showGrid: Bool = true
-    @State private var showSaveSuccess: Bool = false
-    
+
     private let assistService: CameraAssistServiceProtocol = CoreMLCameraAssistService()
     
     init(
         viewModel: CameraViewModel,
-        onExit: @escaping () -> Void = {}
+        onExit: @escaping () -> Void = {},
+        onNavigateToMap: @escaping (UUID) -> Void = { _ in }
     ) {
         _viewModel = StateObject(wrappedValue: viewModel)
         self.onExit = onExit
+        self.onNavigateToMap = onNavigateToMap
     }
     
     var body: some View {
@@ -109,31 +112,29 @@ struct CameraView: View {
             case .result:
                 CameraCaptureResultStepView(
                     capturedImage: capturedImage,
-                    lastSaved: viewModel.lastSaved,
+                    result: viewModel.captureResult,
                     errorMessage: viewModel.errorMessage,
-                    onBack: { step = .camera },
-                    onRetake: { step = .camera },
+                    onBack: { viewModel.clearCaptureResult(); step = .camera },
+                    onRetake: { viewModel.clearCaptureResult(); step = .camera },
                     onSave: {
                         guard let capturedImage else { return }
+                        // 저장 성공 시 captureResult가 세팅되어 결과 카드로 전환된다(머무름).
                         viewModel.saveCapturedImage(capturedImage)
-                        showTransientSuccess()
-                        step = .camera
+                    },
+                    onNewShot: { viewModel.clearCaptureResult(); step = .camera },
+                    onViewOnMap: {
+                        guard let id = viewModel.captureResult?.photoID else { return }
+                        onNavigateToMap(id)
                     }
                 )
             }
             
-            if showSaveSuccess {
-                successToast
-                    .transition(.move(edge: .top).combined(with: .opacity))
-            }
-
             if viewModel.hasLocationWarning {
                 locationWarningToast
                     .transition(.move(edge: .top).combined(with: .opacity))
             }
         }
         .animation(.easeInOut(duration: 0.25), value: step)
-        .animation(.spring(response: 0.35, dampingFraction: 0.86), value: showSaveSuccess)
         .animation(.spring(response: 0.35, dampingFraction: 0.86), value: viewModel.hasLocationWarning)
         .onChange(of: viewModel.hasLocationWarning) { _, isWarning in
             guard isWarning else { return }
@@ -223,28 +224,6 @@ struct CameraView: View {
         }
     }
     
-    private var successToast: some View {
-        HStack(spacing: LensNoteTheme.Spacing.xxs) {
-            Image(systemName: "checkmark.circle.fill")
-                .foregroundStyle(LensNoteTheme.Colors.success)
-            Text("사진이 저장되었습니다.")
-                .font(LensNoteTheme.Typography.bodyStrong)
-                .foregroundStyle(LensNoteTheme.Colors.textPrimary)
-        }
-        .padding(.horizontal, LensNoteTheme.Spacing.sm)
-        .padding(.vertical, LensNoteTheme.Spacing.xs)
-        .background(
-            ZStack {
-                LensNoteTheme.Colors.surfaceHigh
-                Color.clear.background(.ultraThinMaterial)
-            }
-        )
-        .clipShape(Capsule())
-        .shadow(color: LensNoteTheme.Shadow.ambient, radius: 12, y: 4)
-        .padding(.top, 60)
-        .frame(maxHeight: .infinity, alignment: .top)
-    }
-
     private var locationWarningToast: some View {
         HStack(spacing: 10) {
             Image(systemName: "location.slash.fill")
@@ -328,13 +307,5 @@ struct CameraView: View {
         referencePickerItem = nil
         // Req 1 — 레퍼런스 해제 시 라이브 코칭도 비활성화.
         viewModel.setReferenceRecipe(nil)
-    }
-    
-    private func showTransientSuccess() {
-        showSaveSuccess = true
-        Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 1_800_000_000)
-            showSaveSuccess = false
-        }
     }
 }
