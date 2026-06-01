@@ -34,6 +34,13 @@ final class MapViewModel: NSObject, ObservableObject {
     @Published var isLoading: Bool = false
     /// 외부(카메라 결과 카드)에서 요청한 포커스 좌표. MapView가 카메라 이동에 사용 후 clearFocus()로 비운다 (Req 2.2).
     @Published var focusCoordinate: GeoCoordinate?
+    /// 활성 기간 필터. 기본값 전체 (Req 6.3).
+    @Published private(set) var activeDateFilter: DateRangeFilter = .all
+
+    /// 활성 기간 필터를 적용한 핀 목록 (Req 6.2).
+    var filteredPins: [PhotoPin] {
+        pins.filter { activeDateFilter.includes($0.createdAt) }
+    }
 
     /// 아직 핀이 로드되기 전이라 보류된 선택 요청 id.
     private var pendingSelectionID: UUID?
@@ -216,6 +223,14 @@ final class MapViewModel: NSObject, ObservableObject {
     /// 핀 선택/해제하여 하단 카드 표시 제어
     func select(pin: PhotoPin) {
         selectedPin = pin
+    }
+
+    /// 기간 필터를 변경한다. 현재 선택된 핀이 새 필터에 포함되지 않으면 선택을 해제한다 (Req 6.6).
+    func applyDateFilter(_ filter: DateRangeFilter) {
+        activeDateFilter = filter
+        if let pin = selectedPin, !filter.includes(pin.createdAt) {
+            closeCard()
+        }
     }
 
     /// 카메라 결과 카드에서 저장된 사진의 핀을 선택 요청한다 (Req 2.2).
