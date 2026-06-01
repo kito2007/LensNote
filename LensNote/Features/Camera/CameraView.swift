@@ -83,6 +83,8 @@ struct CameraView: View {
                         guard let preset = referenceGeneratedPreset else { return }
                         viewModel.preset = preset
                         viewModel.conceptText = "Reference Mood"
+                        // Req 1 — 레퍼런스 ShotRecipe를 VM에 전달해 라이브 코칭 활성화.
+                        viewModel.setReferenceRecipe(referenceGeneratedRecipe)
                         step = .camera
                     }
                 )
@@ -93,6 +95,8 @@ struct CameraView: View {
                     onStartCamera: {
                         viewModel.conceptText = conceptInput
                         viewModel.applyConcept()
+                        // 컨셉 경로 진입 — 레퍼런스 코칭 비활성화.
+                        viewModel.setReferenceRecipe(nil)
                         step = .camera
                     }
                 )
@@ -109,6 +113,8 @@ struct CameraView: View {
                             temperature: manualTemperature,
                             vignette: manualVignette
                         )
+                        // 수동 경로 진입 — 레퍼런스 코칭 비활성화.
+                        viewModel.setReferenceRecipe(nil)
                         step = .camera
                     },
                     manualExposure: $manualExposure,
@@ -309,6 +315,8 @@ struct CameraView: View {
         referenceImageData = nil
         selectedReferenceImage = nil
         referencePickerItem = nil
+        // Req 1 — 레퍼런스 해제 시 라이브 코칭도 비활성화.
+        viewModel.setReferenceRecipe(nil)
     }
     
     private func showTransientSuccess() {

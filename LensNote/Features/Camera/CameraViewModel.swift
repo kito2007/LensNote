@@ -87,9 +87,16 @@ final class CameraViewModel: NSObject, ObservableObject {
     @Published var coreMLSubjectBox: CGRect? = nil
     /// AI 기반 구도 힌트 문구 (원본, 디바운스 전).
     @Published var coreMLGuidanceHint: String? = nil
-    /// UI에 실제로 노출되는 최종 구도 힌트. CoreML 힌트(디바운스 통과) > Vision guidanceMessage 순으로 선택.
+    /// UI에 실제로 노출되는 최종 구도 힌트. 라이브 코칭 > CoreML 힌트(디바운스 통과) > Vision guidanceMessage 순으로 선택.
     /// 힌트가 없으면 nil — UI에서 배너를 숨긴다.
     @Published private(set) var activeGuidanceHint: String? = nil
+
+    // MARK: - 라이브 코칭 (Req 1)
+    /// 레퍼런스 사진에서 추출한 ShotRecipe. 설정되면 라이브 프레임과 비교해 코칭 메시지를 만든다.
+    /// nil이면 코칭 비활성 — 기존 Vision/CoreML 힌트만 사용한다.
+    @Published private(set) var referenceRecipe: ShotRecipe? = nil
+    /// 직전 프레임의 라이브 코칭 메시지(원본, 디바운스 전). 레퍼런스 미설정 시 nil.
+    private var coachingMessage: String? = nil
 
     let session = AVCaptureSession()
 
@@ -384,6 +391,18 @@ extension CameraViewModel: AVCaptureVideoDataOutputSampleBufferDelegate {
     }
 }
 
+extension CameraViewModel {
+    /// 레퍼런스 ShotRecipe를 설정/해제한다(Req 1). nil이면 코칭을 즉시 비활성화한다.
+    @MainActor
+    func setReferenceRecipe(_ recipe: ShotRecipe?) {
+        referenceRecipe = recipe
+        if recipe == nil {
+            coachingMessage = nil
+            updateActiveGuidanceHint()
+        }
+    }
+}
+
 private extension CameraViewModel {
     /// CoreML AI 추론 결과를 Published 프로퍼티에 반영한다.
     /// 기존 Vision 기반 guidanceMessage/overlayState는 건드리지 않는다.
@@ -393,7 +412,34 @@ private extension CameraViewModel {
         inferenceScore = output.inferenceScore
         coreMLSubjectBox = output.subjectBoundingBox
         coreMLGuidanceHint = output.guidanceHint
+        coachingMessage = makeCoachingMessage(from: output)
         updateActiveGuidanceHint()
+    }
+
+    /// 레퍼런스가 설정된 경우, 라이브 프레임 추론 결과를 ShotRecipe로 환산해 코칭 델타를 계산한다.
+    /// 라이브 경로에는 face landmark가 없어 cameraAngle은 nil → 실제로는 coverage 코칭 위주(Req 1.8).
+    @MainActor
+    func makeCoachingMessage(from output: AIInferenceOutput) -> String? {
+        guard referenceRecipe != nil else { return nil }
+        // 피사체 미검출(bbox nil) 시 coverage를 nil로 두어 해당 축 코칭을 생략한다(Req 1.8).
+        let liveCoverage: Double? = output.subjectBoundingBox == nil ? nil : output.subjectCoverage
+        let live = ShotRecipe(
+            focalLength35mm: nil,
+            aperture: nil,
+            iso: nil,
+            shutterSpeed: nil,
+            subjectCoverage: liveCoverage,
+            subjectVerticalPosition: nil,
+            subjectBoundingBox: output.subjectBoundingBox.map(CodableRect.init),
+            cameraAngle: nil,
+            gazeDirection: nil,
+            faceYaw: nil,
+            facePitch: nil,
+            horizonTilt: nil,
+            detectedStyle: .unknown,
+            styleConfidence: .low
+        )
+        return LiveCoachingEngine.compare(reference: referenceRecipe, live: live)?.primaryMessage
     }
 
     /// CoreML 힌트(디바운스 통과)를 우선 사용하고, CoreML이 활성화되지 않은 경우에만 Vision 메시지로 폴백한다.
@@ -403,8 +449,12 @@ private extension CameraViewModel {
         let now = Date()
         var candidate: String? = nil
 
-        // 1. CoreML 힌트 안정화
-        if let hint = coreMLGuidanceHint {
+        // 0. 라이브 코칭(레퍼런스 비교)이 있으면 최우선, 없으면 CoreML 힌트.
+        //    레퍼런스 미설정 시 coachingMessage는 nil이라 기존 동작과 동일하다(Req 1.5).
+        let primaryHint = coachingMessage ?? coreMLGuidanceHint
+
+        // 1. 우선 힌트 안정화 (0.9초 — Req 1.6)
+        if let hint = primaryHint {
             if pendingCoreMLHint == hint {
                 if now.timeIntervalSince(pendingCoreMLHintSince) >= coreMLHintStabilityThreshold {
                     candidate = hint
