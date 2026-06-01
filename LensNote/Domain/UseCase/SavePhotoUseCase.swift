@@ -12,13 +12,20 @@ import Foundation
 struct SavePhotoUseCase {
     let repository: PhotoRepositoryProtocol
 
-    /// 경로/좌표를 받아 PhotoItem을 생성하고 저장 후 반환한다.
-    func execute(imagePath: String, coordinate: GeoCoordinate?) throws -> PhotoItem {
+    /// 경로/좌표/촬영 메타데이터를 받아 PhotoItem을 생성하고 저장 후 반환한다.
+    func execute(
+        imagePath: String,
+        coordinate: GeoCoordinate?,
+        shotStyle: ShotStyle? = nil,
+        filterPresetName: String? = nil
+    ) throws -> PhotoItem {
         let item = PhotoItem(
             id: UUID(),
             createdAt: Date(),
             imagePath: imagePath,
-            coordinate: coordinate
+            coordinate: coordinate,
+            shotStyle: shotStyle,
+            filterPresetName: filterPresetName
         )
         try repository.save(item)
         return item

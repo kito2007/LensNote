@@ -249,7 +249,11 @@ final class CameraViewModel: NSObject, ObservableObject {
         let resolvedCoordinate = coordinate ?? locationProvider.latestCoordinate
         do {
             let filePath = try persistImageToDocuments(image)
-            let saved = try savePhotoUseCase.execute(imagePath: filePath, coordinate: resolvedCoordinate)
+            let saved = try savePhotoUseCase.execute(
+                imagePath: filePath,
+                coordinate: resolvedCoordinate,
+                filterPresetName: preset?.name
+            )
             lastSaved = saved
             errorMessage = nil
             if resolvedCoordinate == nil {

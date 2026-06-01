@@ -21,5 +21,25 @@ struct PhotoItem: Codable, Equatable, Identifiable {
     let createdAt: Date
     let imagePath: String
     let coordinate: GeoCoordinate?
+    /// 촬영 당시 적용된 ShotStyle. 레퍼런스 분석 없이 촬영하면 nil.
+    /// Profile 통계(가장 많이 쓴 스타일) 집계에 사용한다.
+    let shotStyle: ShotStyle?
+    /// 촬영 당시 적용된 FilterPreset 이름. 프리셋 미적용 시 nil.
+    let filterPresetName: String?
 
+    init(
+        id: UUID,
+        createdAt: Date,
+        imagePath: String,
+        coordinate: GeoCoordinate?,
+        shotStyle: ShotStyle? = nil,
+        filterPresetName: String? = nil
+    ) {
+        self.id = id
+        self.createdAt = createdAt
+        self.imagePath = imagePath
+        self.coordinate = coordinate
+        self.shotStyle = shotStyle
+        self.filterPresetName = filterPresetName
+    }
 }
