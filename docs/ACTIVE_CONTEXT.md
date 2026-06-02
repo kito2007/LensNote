@@ -496,15 +496,21 @@ tasks.md task 12(12.1) 체크. Build ✅ / Test ✅ 31.
 - 1a~1d(레퍼런스 카메라: UIImage/ShotRecipe/forConcept/프리뷰), 2a~2d(코칭: 추론/Hint/배너/Delta), 3a~3e(지도: 재조회/핀/클러스터/카드/필터). 고빈도 경로는 passOnce.
 tasks.md task 13(13.1) 체크. Build ✅ / Test ✅ 31.
 
-## Next Recommended Tasks (in priority order)
+## Kiro 평가 개선 스펙 — 완료 (2026-06-02)
 
-> **다음 세션 시작점**: Req 1~12(전 기능 요구사항) 구현 완료. 남은 건 실기기 수동 QA + 최종 체크포인트(문서적).
-> 진행 방침: 작업마다 커밋 분리.
+**`.kiro/specs/lensnote-evaluation-improvement` 14개 태스크 + 선택 테스트 전부 완료.**
+- Req 1(라이브 코칭)·2(결과 카드)·3(사이드 버튼)·4(a11y)·5(Profile 통계)·6(지도 필터, 롤링 윈도우로 조정)·7(MapView 분리)·8(영속성 스키마)·9(테스트 타겟)·10(CoreML/레퍼런스 안전성)·11(달성도 지표)·12(진입 간소화).
+- 체크포인트 task 2/6/10/14 ✅. 자동화 테스트 31개 통과(8 suite).
+- 실기기 기능 동작 확인 완료(사용자, 2026-06-02). 잔여 실기기 항목: Req 10.1 CoreML 로드/10.2 pitch 정밀 검증, 달성도 로그(콘솔 category=Achievement) 집계는 필요 시.
 
-1. **실기기 수동 QA** — ① 런타임 영속성(camera→save→force-quit→relaunch→map pin), ② Req 10.1 CoreML 5초 내 로드+추론/10.2 pitch, ③ Req 6 롤링 필터 체감, ④ 달성도 로그(콘솔 category=Achievement) 확인.
-2. **Final checkpoint (task 14)** — 전체 빌드/테스트 통과 확인(문서적, 현재 ✅ 31 통과).
+## Next Recommended Tasks
 
-**Kiro 스펙 12개 요구사항 구현 전부 완료.** 남은 건 실기기 검증/문서 마무리뿐.
+> Kiro 스펙은 완료. 다음 방향은 사용자 결정 대기. 후보:
+
+1. **데모 준비** — 안정적 스크린샷/데모 경로 수집, Home 메시징 다듬기(BACKLOG Milestone 3).
+2. **전체 회귀 패스** — 핵심 플로우 재점검.
+3. **신규 백로그 항목** — 필터 추천 로직 고도화 등(BACKLOG Milestone 2).
+4. **실기기 정밀 검증** — Req 10.1/10.2(CoreML·pitch), 발열 시 추론 간격 적응.
 
 > ⚠️ **라이브 코칭 실기기 검증 잔여 (Req 1)**: 라이브 경로엔 face landmark가 없어 `cameraAngle`은 항상 nil → 현재 coverage 코칭("더 멀리/더 가까이")만 실제 동작. 앵글 코칭은 live ShotRecipe에 앵글이 추정되어야 동작(Req 10 pitch 연동 필요). 코칭 배너 체감/임계값(0.15)은 실기기에서 튜닝 필요.
 

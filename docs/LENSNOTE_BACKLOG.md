@@ -38,27 +38,27 @@
 - [x] Make concept input clearly influence filter recommendation or preset selection in a visible way.
   Done: `FilterPreset.forConcept(_:)` 단일 룰 추출(야경/인물/풍경까지 확장), `PresetSummaryView` 공용 추출, CameraConceptStepView에 suggestion chips + 실시간 preset preview 카드 + "{preset.name}으로 시작" CTA 반영. (2026-04-18)
 
-- [ ] Improve capture result feedback after saving a photo.
-  Why: users need confidence that the shot was saved and connected to the LensNote flow.
-  Owner: `lensnote-designer` -> `lensnote-ios-engineer`
+- [x] Improve capture result feedback after saving a photo.
+  Done: 저장 후 결과 카드(썸네일/위치명 역지오코딩/프리셋/ShotStyle + "지도에서 보기") + 실패 시 재시도. (Kiro Req 2, 2026-06-02)
 
-- [ ] Add accessibility identifiers or stable labels to key UI controls for simulator automation.
-  Why: this makes XcodeBuildMCP testing more reliable.
-  Owner: `lensnote-ios-engineer`
+- [x] Add accessibility identifiers or stable labels to key UI controls for simulator automation.
+  Done: camera.*/dock.tab.*/map.pin.*/map.filter.* 식별자 부여. (Kiro Req 4, 2026-06-02)
 
 ## Milestone 2: Quality And Product Depth
 
 - [ ] Refine filter recommendation logic and visible presentation.
 - [x] Improve map pin detail cards and browsing flow.
   Done: PinCardView에 source 뱃지, 56pt 썸네일, cardLarge radius 적용. SidePanelList와 상호 배타 표시. (2026-04-02)
-- [ ] Decompose oversized feature files where the payoff is clear, especially `MapView.swift`.
+- [x] Decompose oversized feature files where the payoff is clear, especially `MapView.swift`.
+  Done: `Features/Map/Views/` 서브뷰 분리(PinAnnotation/Cluster/SidePanel/PinCard/PermissionOverlay/EmptyState/Loading) + MapRegionFilter 추출. (Kiro Req 7, 2026-06-02)
 - [ ] Add stronger error and permission recovery messaging.
 - [ ] Expand simulator QA scenarios for home, camera, and map flows.
 
 ## Milestone 3: Demo Readiness And Polish
 
 - [ ] Tighten Home screen messaging so the product story is instantly clear.
-- [ ] Improve Profile or remove placeholder feeling if it stays in the demo.
+- [x] Improve Profile or remove placeholder feeling if it stays in the demo.
+  Done: "Coming soon" 제거, 촬영 통계(총촬영/최다 ShotStyle/최다 Preset) + 빈/에러 상태. (Kiro Req 5, 2026-06-02)
 - [ ] Collect stable screenshots and demo paths.
 - [ ] Perform final regression pass across key flows.
 

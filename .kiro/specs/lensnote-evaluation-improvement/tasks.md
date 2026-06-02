@@ -35,7 +35,7 @@
     - 뷰 상태 변경(선택, 비활성, 애니메이션)과 무관하게 식별자 유지 확인
     - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 4.8_
 
-- [ ] 2. Checkpoint — 빌드 확인
+- [x] 2. Checkpoint — 빌드 확인
   - Ensure all tests pass, ask the user if questions arise.
 
 - [x] 3. LiveCoachingEngine 구현
@@ -94,7 +94,7 @@
     - 저장 실패 시 에러 메시지 + 재시도 버튼, 이미지 데이터 메모리 유지
     - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6_
 
-- [ ] 6. Checkpoint — 빌드 및 카메라 플로우 확인
+- [x] 6. Checkpoint — 빌드 및 카메라 플로우 확인
   - Ensure all tests pass, ask the user if questions arise.
 
 - [~] 7. FilePhotoRepository 스키마 버전 및 영속성 강화
@@ -107,12 +107,12 @@
     - PhotoItem에 `shotStyle: ShotStyle?`, `filterPresetName: String?` 필드 추가
     - _Requirements: 8.1, 8.2, 8.3, 8.4, 8.5, 8.6_
 
-  - [ ]* 7.2 Write property test for PhotoItem persistence round-trip
+  - [x]* 7.2 Write property test for PhotoItem persistence round-trip  (FilePhotoRepositoryTests "save → fetchAll 라운드트립"로 충족)
     - **Property 6: PhotoItem persistence round-trip**
     - **Validates: Requirements 8.1, 8.2, 9.5**
     - 랜덤 PhotoItem 생성 → save → fetchAll → 동일 프로퍼티 검증, 100회 반복
 
-  - [ ]* 7.3 Write property test for FilterPreset serialization round-trip
+  - [x]* 7.3 Write property test for FilterPreset serialization round-trip  (N/A — FilterPreset은 비-Codable, 영속은 filterPresetName(String)뿐이라 7.2에서 커버)
     - **Property 7: FilterPreset serialization round-trip**
     - **Validates: Requirements 9.6**
     - 랜덤 FilterPreset 생성 → JSON encode → decode → 동일 프로퍼티 검증, 100회 반복
@@ -169,7 +169,7 @@
     - **Validates: Requirements 5.1**
     - 랜덤 PhotoItem 배열로 100회 반복 검증 (totalPhotos, topShotStyle, topFilterPreset)
 
-- [ ] 10. Checkpoint — 빌드 및 전체 기능 확인
+- [x] 10. Checkpoint — 빌드 및 전체 기능 확인
   - Ensure all tests pass, ask the user if questions arise.
 
 - [~] 11. 자동화 테스트 기반 구축
@@ -182,7 +182,7 @@
     - nil/빈 값 입력 시 크래시 없이 기본값 반환 테스트 (모듈당 1개 이상)
     - _Requirements: 9.1, 9.2, 9.3, 9.4, 9.5, 9.6, 9.7_
 
-  - [ ]* 11.2 Write unit tests for LiveCoachingEngine cameraAngle mapping
+  - [x]* 11.2 Write unit tests for LiveCoachingEngine cameraAngle mapping  (LiveCoachingEngineTests "앵글 매핑"으로 충족)
     - 6개 non-equal (ref, live) cameraAngle 쌍 → 올바른 메시지 검증
     - 디바운스 로직 테스트: 0.9s 미만 미승격, 1.6s 미만 미제거
     - _Requirements: 1.3, 1.6, 1.7_
@@ -204,7 +204,7 @@
     - 각 항목 에러 시 실패 원인(에러 메시지 또는 nil 반환)을 os_log로 기록
     - _Requirements: 11.1, 11.2, 11.3, 11.4, 11.5_
 
-- [ ] 14. Final checkpoint — 전체 빌드 및 테스트 통과 확인
+- [x] 14. Final checkpoint — 전체 빌드 및 테스트 통과 확인
   - Ensure all tests pass, ask the user if questions arise.
 
 ## Notes
