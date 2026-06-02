@@ -1,0 +1,8 @@
+# 레퍼런스 평가셋 데이터 — 사용자 사진(저작권 가능)/생성물은 커밋 제외.
+# 스캐폴딩(README, labels.example.json, 이 .gitignore)만 추적한다.
+
+references/*
+!references/README.txt
+labels.json
+labels.draft.json
+_previews/

@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "tolerances": {
+    "coverage": 0.10,
+    "iou": 0.5
+  },
+  "items": [
+    {
+      "image": "ref_001.jpg",
+      "verified": true,
+      "subjectBox": { "x": 0.20, "y": 0.08, "width": 0.55, "height": 0.84 },
+      "cameraAngle": "eyeLevel",
+      "category": "fullBody",
+      "notes": "정면 전신, 아이레벨"
+    },
+    {
+      "image": "ref_002.jpg",
+      "verified": true,
+      "subjectBox": { "x": 0.28, "y": 0.05, "width": 0.45, "height": 0.55 },
+      "cameraAngle": "highAngle",
+      "category": "halfBody",
+      "notes": "위에서 내려다본 반신 셀피"
+    },
+    {
+      "image": "ref_003.jpg",
+      "verified": true,
+      "subjectBox": null,
+      "cameraAngle": null,
+      "category": "landscape",
+      "notes": "사람 없는 풍경"
+    }
+  ]
+}
