@@ -503,16 +503,22 @@ tasks.md task 13(13.1) 체크. Build ✅ / Test ✅ 31.
 - 체크포인트 task 2/6/10/14 ✅. 자동화 테스트 31개 통과(8 suite).
 - 실기기 기능 동작 확인 완료(사용자, 2026-06-02). 잔여 실기기 항목: Req 10.1 CoreML 로드/10.2 pitch 정밀 검증, 달성도 로그(콘솔 category=Achievement) 집계는 필요 시.
 
+## Completed Work (2026-06-02 — 코드리뷰 피드백 + 카메라 품질 평가 착수)
+
+스펙 완료 후 추가 작업(전부 origin/main 푸시):
+- **코드리뷰 피드백 반영(커밋 b11e23f)**: `buildClusters`/`downsamplePins`를 `MapClusteringHelper`(순수 enum)로 추출 → **MapView 344→291줄(Req 7.3 ≤300 달성)** + 회귀 테스트 3건. requirements 6.1/design Property 3을 롤링 윈도우로 갱신. (피드백의 "DeepLab shape guard"는 이미 Req 10.3에 구현됨.)
+- **카메라 품질 평가 하니스(커밋 bc89464, B+C 전략 1단계)**: "좋은 구도"라는 주관 → "레퍼런스 재현 정확도" 측정으로 전환. `EvalAssets/`(레포 루트), `LensNoteTests/ReferenceAccuracyTests`(`generateLabelDrafts`/`scoreAccuracy`, 시뮬레이터가 호스트 경로 직접 읽음), `docs/REFERENCE_EVAL.md`. 자세한 맥락은 메모리 [[camera-quality-eval]].
+- 자동화 테스트 **36개 통과(10 suite)**.
+
 ## Next Recommended Tasks
 
-> Kiro 스펙은 완료. 다음 방향은 사용자 결정 대기. 후보:
+> **다음 세션 시작점(우선): 카메라 구도 코칭 품질 측정·튜닝(B+C 전략).** 상세 맥락은 메모리 `camera-quality-eval.md` + `docs/REFERENCE_EVAL.md`.
 
-1. **데모 준비** — 안정적 스크린샷/데모 경로 수집, Home 메시징 다듬기(BACKLOG Milestone 3).
-2. **전체 회귀 패스** — 핵심 플로우 재점검.
-3. **신규 백로그 항목** — 필터 추천 로직 고도화 등(BACKLOG Milestone 2).
-4. **실기기 정밀 검증** — Req 10.1/10.2(CoreML·pitch), 발열 시 추론 간격 적응.
+1. **레퍼런스 인식 정확도 측정 시작** — ⏳ **사용자가 `EvalAssets/references/`에 레퍼런스 20~30장(인물 위주) 투입 대기 중.** 투입되면: ① `generateLabelDrafts` 실행(초안+`_previews/` 박스 그림) → ② 사용자 검수로 `labels.json` 확정 → ③ `scoreAccuracy`로 presence/coverage/position/angle 베이스라인 % → ④ 최저 축(특히 angle)부터 `ShotRecipeAnalyzer` 룰 튜닝 → 재측정 반복.
+2. (보류) 데모 준비 / 신규 백로그(필터 추천 고도화) / 실기기 정밀 검증(Req 10.1/10.2).
 
-> ⚠️ **라이브 코칭 실기기 검증 잔여 (Req 1)**: 라이브 경로엔 face landmark가 없어 `cameraAngle`은 항상 nil → 현재 coverage 코칭("더 멀리/더 가까이")만 실제 동작. 앵글 코칭은 live ShotRecipe에 앵글이 추정되어야 동작(Req 10 pitch 연동 필요). 코칭 배너 체감/임계값(0.15)은 실기기에서 튜닝 필요.
+> ⚠️ **라이브 코칭 한계**: 라이브 경로엔 face landmark가 없어 `cameraAngle`은 항상 nil → 현재 coverage 코칭만 실제 동작. angle 코칭 활성화는 라이브 프레임 사람 검출/앵글 추정 구현 필요(Req 10 pitch 연동). 평가에서 angle 축이 낮게 나오는 것과 직결.
+> 위임 원칙(사용자 확인): UI/UX 최종 판단은 사용자, Claude는 시안·구현·반복. 모호한 기능은 "예시+체크가능한 성공기준"으로 위임. 상세 [[camera-quality-eval]].
 
 ## Verification Status
 
@@ -538,8 +544,9 @@ tasks.md task 13(13.1) 체크. Build ✅ / Test ✅ 31.
 - **룰셋 미세 튜닝 + 한국어 조사: build-verified** (`BUILD SUCCEEDED`) — 39장 swift CLI 일괄 검증으로 unknown 8장 모두 의미 있는 라벨로 분류 확인. 실기기 재검증은 다음 세션
 - **영속성 스키마 버전 + 마이그레이션 (Req 8): build-verified + 단위 테스트 검증** — 라운드트립/구버전 마이그레이션 테스트 통과. 실기기 force-quit→relaunch 런타임 검증은 미완료(Req 8 통합 테스트)
 - **단위 테스트 타겟 (Req 9): test-verified** — `xcodebuild test` 13 tests passed (iPhone 17 Pro Simulator). swift-testing, 공유 스킴 TestAction 동작 확인
-- Branch state: main only
-- Last handoff: 2026-06-01
+- **카메라 품질 평가 하니스: test-verified** — `ReferenceAccuracyTests` 36 tests 통과, 데이터 없을 때 스킵 확인. 실데이터(사용자 사진) 투입 후 베이스라인 측정 대기.
+- Branch state: main only / origin/main 동기화됨 (마지막 푸시 bc89464)
+- Last handoff: 2026-06-02
 
 ## Update Rule
 
