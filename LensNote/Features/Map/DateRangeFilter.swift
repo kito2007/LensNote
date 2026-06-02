@@ -26,38 +26,21 @@ enum DateRangeFilter: String, CaseIterable, Identifiable {
         }
     }
 
-    /// 주어진 날짜가 이 필터 기간에 포함되는지 판정한다.
-    /// - today: now와 같은 캘린더 날짜
-    /// - thisWeek: 직전 월요일 00:00 이후
-    /// - thisMonth: 당월 1일 00:00 이후
-    /// - all: 항상 true
-    func includes(_ date: Date, now: Date = Date(), calendar: Calendar = .current) -> Bool {
+    /// 윈도우 길이(초). 롤링 방식이라 항상 today ⊆ thisWeek ⊆ thisMonth ⊆ all 로 중첩된다.
+    /// (캘린더 경계 방식은 월 초에 "이번 주"가 "이번 달"보다 넓어지는 역전이 생겨 롤링으로 정의.)
+    private var window: TimeInterval? {
         switch self {
-        case .all:
-            return true
-        case .today:
-            return calendar.isDate(date, inSameDayAs: now)
-        case .thisWeek:
-            return date >= Self.startOfWeekMonday(now, calendar: calendar)
-        case .thisMonth:
-            return date >= Self.startOfMonth(now, calendar: calendar)
+        case .all:       return nil          // 무제한
+        case .today:     return 24 * 3600     // 최근 24시간
+        case .thisWeek:  return 7 * 86_400    // 최근 7일
+        case .thisMonth: return 30 * 86_400   // 최근 30일
         }
     }
 
-    // MARK: - Boundaries
-
-    /// 직전 월요일 00:00:00. (calendar.firstWeekday와 무관하게 월요일 고정.)
-    static func startOfWeekMonday(_ now: Date, calendar: Calendar) -> Date {
-        let startOfDay = calendar.startOfDay(for: now)
-        // weekday: 1=일 … 7=토. 월요일(2)로부터 경과 일수.
-        let weekday = calendar.component(.weekday, from: startOfDay)
-        let daysSinceMonday = (weekday + 5) % 7
-        return calendar.date(byAdding: .day, value: -daysSinceMonday, to: startOfDay) ?? startOfDay
-    }
-
-    /// 당월 1일 00:00:00.
-    static func startOfMonth(_ now: Date, calendar: Calendar) -> Date {
-        let comps = calendar.dateComponents([.year, .month], from: now)
-        return calendar.date(from: comps) ?? calendar.startOfDay(for: now)
+    /// 주어진 날짜가 이 필터의 롤링 윈도우 [now - window, now] 안에 있는지 판정한다.
+    /// all은 항상 true. (calendar 파라미터는 시그니처 호환을 위해 유지하며 롤링에서는 사용하지 않는다.)
+    func includes(_ date: Date, now: Date = Date(), calendar: Calendar = .current) -> Bool {
+        guard let window else { return true }            // .all
+        return date >= now.addingTimeInterval(-window) && date <= now
     }
 }

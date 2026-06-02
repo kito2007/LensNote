@@ -24,51 +24,57 @@ struct DateRangeFilterTests {
         return c.date(from: DateComponents(year: 2026, month: 6, day: 3, hour: 15, minute: 30))!
     }
 
-    // MARK: - Property 3: 기간 포함 정확성 (Req 6.1, 6.2)
+    // MARK: - Property 3: 롤링 윈도우 포함 정확성 + 중첩 (Req 6.1, 6.2)
 
-    /// 랜덤(결정론적) Date 100회 — 각 필터의 includes가 독립 계산한 경계와 일치하는지.
-    @Test("Property 3: DateRangeFilter 기간 포함 정확성")
-    func includesCorrectness() {
-        let cal = calendar
+    /// 랜덤(결정론적) Date 100회 — 각 필터의 롤링 윈도우 [now-W, now] 포함이 정확하고,
+    /// today ⊆ thisWeek ⊆ thisMonth ⊆ all 중첩이 항상 성립한다.
+    @Test("Property 3: 롤링 윈도우 포함 + 중첩")
+    func rollingWindowInclusionAndNesting() {
         let now = now
-
-        // 독립적으로 유도한 경계.
-        let startToday = cal.startOfDay(for: now)
-        let startTomorrow = cal.date(byAdding: .day, value: 1, to: startToday)!
-        // 직전 월요일: weekday==2가 될 때까지 하루씩 후퇴.
-        var weekStart = startToday
-        while cal.component(.weekday, from: weekStart) != 2 {
-            weekStart = cal.date(byAdding: .day, value: -1, to: weekStart)!
-        }
-        let monthStart = cal.date(from: cal.dateComponents([.year, .month], from: now))!
+        let day = 86_400.0
 
         for i in 0..<100 {
-            // -45일 ~ +3일 범위를 시간 단위로 훑는다.
-            let hoursOffset = (i * 27) % (48 * 24) - 45 * 24
-            let date = cal.date(byAdding: .hour, value: hoursOffset, to: now)!
+            // -40일 ~ +1일 범위를 시간 단위로 훑는다(미래 약간 포함).
+            let hoursOffset = Double((i * 27) % (41 * 24)) - 40 * 24
+            let date = now.addingTimeInterval(hoursOffset * 3600)
+            let delta = now.timeIntervalSince(date)   // 양수면 과거
 
-            #expect(DateRangeFilter.all.includes(date, now: now, calendar: cal) == true,
-                    "all은 항상 true (i=\(i))")
-            #expect(DateRangeFilter.today.includes(date, now: now, calendar: cal)
-                    == (date >= startToday && date < startTomorrow),
-                    "today (i=\(i) date=\(date))")
-            #expect(DateRangeFilter.thisWeek.includes(date, now: now, calendar: cal)
-                    == (date >= weekStart),
-                    "thisWeek (i=\(i) date=\(date))")
-            #expect(DateRangeFilter.thisMonth.includes(date, now: now, calendar: cal)
-                    == (date >= monthStart),
-                    "thisMonth (i=\(i) date=\(date))")
+            let inToday = delta >= 0 && delta <= 24 * 3600
+            let inWeek = delta >= 0 && delta <= 7 * day
+            let inMonth = delta >= 0 && delta <= 30 * day
+
+            #expect(DateRangeFilter.all.includes(date, now: now) == true, "all (i=\(i))")
+            #expect(DateRangeFilter.today.includes(date, now: now) == inToday, "today (i=\(i) delta=\(delta))")
+            #expect(DateRangeFilter.thisWeek.includes(date, now: now) == inWeek, "week (i=\(i) delta=\(delta))")
+            #expect(DateRangeFilter.thisMonth.includes(date, now: now) == inMonth, "month (i=\(i) delta=\(delta))")
+
+            // 중첩 보장: 좁은 윈도우에 들면 넓은 윈도우에도 든다.
+            if DateRangeFilter.today.includes(date, now: now) {
+                #expect(DateRangeFilter.thisWeek.includes(date, now: now), "today⊆week (i=\(i))")
+            }
+            if DateRangeFilter.thisWeek.includes(date, now: now) {
+                #expect(DateRangeFilter.thisMonth.includes(date, now: now), "week⊆month (i=\(i))")
+            }
         }
     }
 
-    @Test("월요일 주 시작 — 직전 월요일 00:00")
-    func mondayWeekStart() {
-        let cal = calendar
-        // now = 수요일. 직전 월요일은 2026-06-01.
-        let weekStart = DateRangeFilter.startOfWeekMonday(now, calendar: cal)
-        let comps = cal.dateComponents([.year, .month, .day, .hour, .minute, .second], from: weekStart)
-        #expect(comps.year == 2026 && comps.month == 6 && comps.day == 1)
-        #expect(comps.hour == 0 && comps.minute == 0 && comps.second == 0)
+    @Test("미래 날짜는 all에만 포함")
+    func futureDateOnlyInAll() {
+        let future = now.addingTimeInterval(3600) // 1시간 뒤
+        #expect(DateRangeFilter.all.includes(future, now: now))
+        #expect(!DateRangeFilter.today.includes(future, now: now))
+        #expect(!DateRangeFilter.thisWeek.includes(future, now: now))
+        #expect(!DateRangeFilter.thisMonth.includes(future, now: now))
+    }
+
+    @Test("경계: 정확히 24시간/7일/30일 전은 포함")
+    func windowBoundariesInclusive() {
+        let day = 86_400.0
+        #expect(DateRangeFilter.today.includes(now.addingTimeInterval(-24 * 3600), now: now))
+        #expect(DateRangeFilter.thisWeek.includes(now.addingTimeInterval(-7 * day), now: now))
+        #expect(DateRangeFilter.thisMonth.includes(now.addingTimeInterval(-30 * day), now: now))
+        // 윈도우 밖
+        #expect(!DateRangeFilter.today.includes(now.addingTimeInterval(-24 * 3600 - 1), now: now))
     }
 
     // MARK: - Property 4: 필터 변경 시 무효 선택 해제 (Req 6.6)
