@@ -489,17 +489,22 @@ tasks.md task 8(8.1~8.5) 체크. Build ✅ / Test ✅ 30.
 tasks.md task 12(12.1) 체크. Build ✅ / Test ✅ 31.
 ⚠️ 실기기 CoreML 로드(10.1)·VNFaceLandmarks pitch(10.2)는 실기기 QA 잔여.
 
+## Completed Work (2026-06-02 — 달성도 지표 Req 11)
+
+3대 목표 기능 13개 항목에 os_log 달성/미달성 체크포인트(1커밋).
+- `Application/AchievementLogger`(pass/fail/passOnce, category=Achievement). 수동 테스트로 앱 한 바퀴 → 콘솔에서 기능별 달성도(1:N/4, 2:N/4, 3:N/5) 집계.
+- 1a~1d(레퍼런스 카메라: UIImage/ShotRecipe/forConcept/프리뷰), 2a~2d(코칭: 추론/Hint/배너/Delta), 3a~3e(지도: 재조회/핀/클러스터/카드/필터). 고빈도 경로는 passOnce.
+tasks.md task 13(13.1) 체크. Build ✅ / Test ✅ 31.
+
 ## Next Recommended Tasks (in priority order)
 
-> **다음 세션 시작점**: Req 1/2/3/4/5/6/8/9/10/12 완료. 거의 마무리 단계.
+> **다음 세션 시작점**: Req 1~12(전 기능 요구사항) 구현 완료. 남은 건 실기기 수동 QA + 최종 체크포인트(문서적).
 > 진행 방침: 작업마다 커밋 분리.
 
-1. **런타임 영속성 통합 검증 (Req 8 잔여)** — camera → save → force-quit → relaunch → map pin 수동 QA(실기기).
-2. **목표 기능 달성도 평가 지표 (Req 11, task 13)** — 달성도 로그/검증 포인트. 선택적(문서/계측 성격).
-3. **체크포인트 (task 2/6/10/14)** — 빌드/전체 기능 확인 단계(문서적).
-4. **실기기 QA 잔여** — Req 10.1(CoreML 5초 내 로드+추론)/10.2(실기기 pitch), Req 6 롤링 필터 체감.
+1. **실기기 수동 QA** — ① 런타임 영속성(camera→save→force-quit→relaunch→map pin), ② Req 10.1 CoreML 5초 내 로드+추론/10.2 pitch, ③ Req 6 롤링 필터 체감, ④ 달성도 로그(콘솔 category=Achievement) 확인.
+2. **Final checkpoint (task 14)** — 전체 빌드/테스트 통과 확인(문서적, 현재 ✅ 31 통과).
 
-핵심 기능 요구사항(Req 1~10, 12) 구현 완료. 남은 건 Req 11(지표, 선택적) + 체크포인트(문서적) + 실기기 수동 QA.
+**Kiro 스펙 12개 요구사항 구현 전부 완료.** 남은 건 실기기 검증/문서 마무리뿐.
 
 > ⚠️ **라이브 코칭 실기기 검증 잔여 (Req 1)**: 라이브 경로엔 face landmark가 없어 `cameraAngle`은 항상 nil → 현재 coverage 코칭("더 멀리/더 가까이")만 실제 동작. 앵글 코칭은 live ShotRecipe에 앵글이 추정되어야 동작(Req 10 pitch 연동 필요). 코칭 배너 체감/임계값(0.15)은 실기기에서 튜닝 필요.
 
