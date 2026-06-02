@@ -249,30 +249,9 @@ struct MapView: View {
         let dateFiltered = viewModel.filteredPins
         guard let region = currentRegion else { return dateFiltered }
         let filtered = dateFiltered.filter { MapRegionFilter.contains($0.coordinate, in: region) }
-        return downsamplePins(filtered, in: region)
+        return MapClusteringHelper.downsample(filtered, in: region)
     }
 
-    /// 핀이 너무 많을 때 격자 버킷으로 대표 핀만 남겨 UI 부하 감소
-    private func downsamplePins(_ pins: [PhotoPin], in region: MKCoordinateRegion) -> [PhotoPin] {
-        guard pins.count > 250 else { return pins }
-
-        let latStep = max(region.span.latitudeDelta / 25, 0.001)
-        let lonStep = max(region.span.longitudeDelta / 25, 0.001)
-        var buckets: [String: PhotoPin] = [:]
-
-        for pin in pins {
-            let latBucket = Int((pin.latitude / latStep).rounded(.down))
-            let lonBucket = Int((pin.longitude / lonStep).rounded(.down))
-            let key = "\(latBucket)_\(lonBucket)"
-            if buckets[key] == nil {
-                buckets[key] = pin
-            }
-        }
-
-        return Array(buckets.values)
-    }
-
-    /// 영역 스케일에 따라 적응형 격자 크기를 계산하여 클러스터링(단일/클러스터 아이템 생성)
     /// 지정 좌표로 지도 카메라를 이동하고 포커스 요청을 소비한다 (Req 2.2).
     private func focusCamera(on coord: GeoCoordinate) {
         withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
@@ -286,38 +265,6 @@ struct MapView: View {
         viewModel.clearFocus()
     }
 
-    private func buildClusters(from pins: [PhotoPin], in region: MKCoordinateRegion?) -> [ClusterItem] {
-        guard let region else { return pins.map { ClusterItem(id: $0.id, kind: .single($0)) } }
-        // Determine grid size based on zoom level
-        let grid = max(Int(ceil(25.0 * (0.08 / max(region.span.latitudeDelta, 0.0005)))), 8)
-        let latStep = max(region.span.latitudeDelta / Double(grid), 0.0005)
-        let lonStep = max(region.span.longitudeDelta / Double(grid), 0.0005)
-
-        var buckets: [String: [PhotoPin]] = [:]
-        for pin in pins {
-            let latBucket = Int(floor((pin.latitude - (region.center.latitude - region.span.latitudeDelta/2)) / latStep))
-            let lonBucket = Int(floor((pin.longitude - (region.center.longitude - region.span.longitudeDelta/2)) / lonStep))
-            let key = "\(latBucket)_\(lonBucket)"
-            buckets[key, default: []].append(pin)
-        }
-
-        var items: [ClusterItem] = []
-        for (_, group) in buckets {
-            if group.count == 1, let pin = group.first {
-                items.append(ClusterItem(id: pin.id, kind: .single(pin)))
-            } else {
-                // Compute centroid
-                let avgLat = group.map { $0.latitude }.reduce(0, +) / Double(group.count)
-                let avgLon = group.map { $0.longitude }.reduce(0, +) / Double(group.count)
-                let center = CLLocationCoordinate2D(latitude: avgLat, longitude: avgLon)
-                items.append(ClusterItem(id: UUID(), kind: .cluster(center: center, pins: group)))
-                // 3c — 반경 내 2개 이상 핀이 클러스터로 그룹화됨.
-                AchievementLogger.passOnce("3c", "핀 클러스터링", detail: "\(group.count)개 그룹")
-            }
-        }
-        return items
-    }
-
     /// 지도 이동/줌 중 과도한 클러스터 재계산을 줄이기 위한 디바운스 스케줄러.
     /// immediate가 true면 즉시 계산, false면 짧게 지연 후 마지막 상태만 반영한다.
     private func scheduleClusterRebuild(immediate: Bool = false) {
@@ -327,14 +274,14 @@ struct MapView: View {
         let regionSnapshot = currentRegion
 
         if immediate {
-            clusteredItems = buildClusters(from: pinsSnapshot, in: regionSnapshot)
+            clusteredItems = MapClusteringHelper.buildClusters(from: pinsSnapshot, in: regionSnapshot)
             return
         }
 
         clusterRebuildTask = Task { @MainActor in
             try? await Task.sleep(nanoseconds: 130_000_000)
             guard !Task.isCancelled else { return }
-            clusteredItems = buildClusters(from: pinsSnapshot, in: regionSnapshot)
+            clusteredItems = MapClusteringHelper.buildClusters(from: pinsSnapshot, in: regionSnapshot)
         }
     }
 }

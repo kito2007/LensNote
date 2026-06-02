@@ -368,7 +368,7 @@ extension FilterPreset: Codable {
 
 ### Property 3: DateRangeFilter date inclusion correctness
 
-*For any* Date value and *for any* DateRangeFilter value, the `includes(_:now:calendar:)` method SHALL return true if and only if the date falls within the defined range (today: same calendar day, thisWeek: since last Monday 00:00, thisMonth: since 1st of month 00:00, all: always true).
+*For any* Date value and *for any* DateRangeFilter value, the `includes(_:now:calendar:)` method SHALL return true if and only if the date falls within the rolling window `[now - window, now]` (today: 24h, thisWeek: 7 days, thisMonth: 30 days, all: always true). 이로써 today ⊆ thisWeek ⊆ thisMonth ⊆ all 중첩이 항상 성립한다. (구현 변경: 캘린더 경계 → 롤링 윈도우, 2026-06-02.)
 
 **Validates: Requirements 6.1, 6.2**
 
