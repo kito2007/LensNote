@@ -474,7 +474,7 @@ tasks.md task 9(9.1/9.2) 체크. Build ✅ / Test ✅ 24.
 ## Completed Work (2026-06-02 — 지도 기간/지역 필터 Req 6)
 
 지도 기간 필터 + 지역(영역) 목록. 2커밋.
-- `DateRangeFilter`(all/today/thisWeek/thisMonth) `includes(_:now:calendar:)`: today=같은 날, thisWeek=직전 월요일 00:00↑(firstWeekday 무관 월요일 고정), thisMonth=1일 00:00↑, all=true. 로컬 타임존.
+- `DateRangeFilter`(all/today/thisWeek/thisMonth) `includes(_:now:calendar:)`: **롤링 윈도우**(today=최근 24h, thisWeek=최근 7일, thisMonth=최근 30일, all=무제한). ⚠️ **스펙(requirements.md 6.1)의 캘린더 경계(직전 월요일/1일)에서 변경됨** — 월 초에 "이번 주 > 이번 달" 역전이 생겨 사용자 요청으로 롤링으로 조정(커밋 717b6b4). today⊆week⊆month 항상 중첩. 칩 라벨은 오늘/이번 주/이번 달 유지.
 - `MapViewModel`: `activeDateFilter`(.all 기본) + `filteredPins` + `applyDateFilter`(선택 핀이 새 필터 미포함이면 closeCard, Req 6.6).
 - `DateFilterChipRow`(상단 칩, 활성 accentCyan / 비활성 surfaceHigh·textTertiary, 식별자 `map.filter.<case>`). `MapView.visiblePins`를 `filteredPins` 기반으로 전환 → 클러스터+목록 모두 기간 반영. 0건 시 "이 기간에 촬영된 사진이 없어요"(6.5). 지역 필터는 기존 `visiblePins`(현재 영역 내, 6.7).
 - 공간 판정 `isCoordinate`를 `MapRegionFilter.contains(_:in:)` 순수 함수로 추출.
