@@ -63,6 +63,8 @@ struct CameraView: View {
     @State private var referenceGeneratedPreset: FilterPreset? = nil
     @State private var referenceImageData: Data? = nil
     @State private var referenceGeneratedRecipe: ShotRecipe? = nil
+    /// 진행 중인 레퍼런스 분석 Task. 뒤로가기 시 취소한다 (Req 10.5).
+    @State private var referenceAnalysisTask: Task<Void, Never>? = nil
     @State private var showGrid: Bool = true
 
     private let assistService: CameraAssistServiceProtocol = CoreMLCameraAssistService()
@@ -283,18 +285,24 @@ struct CameraView: View {
         referenceGeneratedRecipe = nil
         referenceAnalysisStage = .extractingTone
 
-        Task { @MainActor in
+        // 이전 분석이 남아있으면 취소하고 새 Task를 보관한다 (Req 10.5).
+        referenceAnalysisTask?.cancel()
+        referenceAnalysisTask = Task { @MainActor in
+            // 각 단계 전 취소 여부 확인 — 뒤로가기로 취소되면 상태를 더 바꾸지 않는다.
             // 단계 1: 톤 분석
             try? await Task.sleep(nanoseconds: 650_000_000)
+            if Task.isCancelled { return }
             referenceAnalysisStage = .extractingColor
 
             // 단계 2: 컬러 추출
             try? await Task.sleep(nanoseconds: 650_000_000)
+            if Task.isCancelled { return }
             referenceAnalysisStage = .generatingPreset
 
             // 단계 3: 프리셋 분석 (동기, 가벼움)
             let preset = assistService.analyzeReferenceImage(image)
             try? await Task.sleep(nanoseconds: 500_000_000)
+            if Task.isCancelled { return }
             referenceGeneratedPreset = preset
 
             // 단계 4: 샷 레시피 추출 — 실제 Vision/DeepLabV3 분석, 백그라운드에서 실행
@@ -303,14 +311,16 @@ struct CameraView: View {
                 await ShotRecipeAnalyzer().analyze(imageData: data)
             }.value
 
-            await MainActor.run {
-                referenceGeneratedRecipe = recipe
-                referenceAnalysisStage = .completed
-            }
+            if Task.isCancelled { return }
+            referenceGeneratedRecipe = recipe
+            referenceAnalysisStage = .completed
         }
     }
 
     private func resetReferenceFlow() {
+        // Req 10.5 — 진행 중인 분석 Task 취소 후 상태 초기화.
+        referenceAnalysisTask?.cancel()
+        referenceAnalysisTask = nil
         referenceAnalysisStage = .idle
         referenceGeneratedPreset = nil
         referenceGeneratedRecipe = nil

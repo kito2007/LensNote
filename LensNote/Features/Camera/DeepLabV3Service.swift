@@ -10,6 +10,7 @@ import CoreML
 import CoreImage
 import CoreVideo
 import Accelerate
+import os
 
 /// DeepLabV3 시맨틱 세그멘테이션 결과.
 struct SegmentationResult {
@@ -63,8 +64,10 @@ private enum DeepLabClass: Int, CaseIterable {
 final class DeepLabV3Service {
 
     private static let modelInputSize = CGSize(width: 513, height: 513)
+    private static let gridSize = 513
     /// 성능을 위해 전체 픽셀 대신 stepSize 간격으로 샘플링한다.
     private static let sampleStride = 8
+    private static let logger = Logger(subsystem: "com.PTY.LensNote", category: "DeepLabV3")
 
     // MARK: - Lazy model load
 
@@ -96,6 +99,14 @@ final class DeepLabV3Service {
         // 4. semanticPredictions MLMultiArray 추출
         guard let multiArray = output.featureValue(for: "semanticPredictions")?.multiArrayValue else { return nil }
 
+        // 4-1. shape 검증 (Req 10.3) — [513, 513]이 아니면 에러 로그 + nil. 후처리가 잘못된 인덱싱을
+        //      하지 않도록 방어한다. (인덱스 오버플로 가드는 별도지만, shape 불일치 자체를 조기 차단.)
+        let dims = multiArray.shape.suffix(2).map(\.intValue)
+        guard dims == [Self.gridSize, Self.gridSize] else {
+            Self.logger.error("DeepLabV3 semanticPredictions shape mismatch: \(multiArray.shape) (expected [..,513,513])")
+            return nil
+        }
+
         // 5. stride 샘플링으로 후처리
         return postprocess(multiArray: multiArray)
     }
@@ -124,7 +135,7 @@ final class DeepLabV3Service {
     // MARK: - Private: postprocess
 
     private func postprocess(multiArray: MLMultiArray) -> SegmentationResult {
-        let gridSize = 513
+        let gridSize = Self.gridSize
         let stepSize = Self.sampleStride
         let totalClasses = DeepLabClass.allCases.count // 21
 
