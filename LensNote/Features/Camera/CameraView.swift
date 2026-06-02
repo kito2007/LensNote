@@ -157,6 +157,12 @@ struct CameraView: View {
             // 라이브 뷰에서만 AVCaptureSession을 실행하고, 결과 단계에서는 중지한다.
             if step == .camera {
                 await viewModel.startSessionIfNeeded()
+                // 1d — 라이브 뷰 프리뷰가 프리셋이 적용된 상태로 렌더링됨.
+                if let preset = viewModel.preset {
+                    AchievementLogger.pass("1d", "라이브 뷰 프리셋 적용 프리뷰", detail: preset.name)
+                } else {
+                    AchievementLogger.pass("1d", "라이브 뷰 프리뷰", detail: "프리셋 미설정(기본 카메라)")
+                }
             } else {
                 viewModel.stopSession()
             }
@@ -271,7 +277,11 @@ struct CameraView: View {
     private func loadReferenceImage(from item: PhotosPickerItem) async {
         // PhotosPickerItem -> Data -> UIImage 변환
         guard let data = try? await item.loadTransferable(type: Data.self),
-              let image = UIImage(data: data) else { return }
+              let image = UIImage(data: data) else {
+            AchievementLogger.fail("1a", "레퍼런스 사진 → UIImage", reason: "loadTransferable 또는 UIImage(data:) nil")
+            return
+        }
+        AchievementLogger.pass("1a", "레퍼런스 사진 → UIImage", detail: "\(Int(image.size.width))x\(Int(image.size.height))")
         await MainActor.run {
             selectedReferenceImage = image
             referenceImageData = data
@@ -312,6 +322,7 @@ struct CameraView: View {
             }.value
 
             if Task.isCancelled { return }
+            AchievementLogger.pass("1b", "ShotRecipeAnalyzer → ShotRecipe", detail: "style=\(recipe.detectedStyle.rawValue)")
             referenceGeneratedRecipe = recipe
             referenceAnalysisStage = .completed
         }

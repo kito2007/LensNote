@@ -90,7 +90,17 @@ final class MapViewModel: NSObject, ObservableObject {
     /// 좌표 없는 PhotoItem은 지도에 표시할 수 없으므로 스킵한다.
     func loadLensNotePins() {
         guard let useCase = fetchPhotoPinsUseCase else { return }
-        let items = (try? useCase.execute()) ?? []
+        let items: [PhotoItem]
+        do {
+            items = try useCase.execute()
+            if !items.isEmpty {
+                // 3a — 저장된 사진이 FilePhotoRepository에서 재조회됨(영속 라운드트립).
+                AchievementLogger.passOnce("3a", "저장→재조회 데이터 반환", detail: "\(items.count)건")
+            }
+        } catch {
+            AchievementLogger.fail("3a", "저장→재조회 데이터 반환", reason: String(describing: error))
+            items = []
+        }
         let dateFormatter = DateFormatter()
         dateFormatter.dateStyle = .medium
         dateFormatter.timeStyle = .none
@@ -112,6 +122,10 @@ final class MapViewModel: NSObject, ObservableObject {
         // 기존 lensNote 핀을 교체하고 library 핀은 유지한다.
         let libraryPins = pins.filter { $0.source == .library }
         pins = newPins + libraryPins
+        if !pins.isEmpty {
+            // 3b — 저장된 PhotoPin이 지도에 핀으로 표시됨.
+            AchievementLogger.passOnce("3b", "PhotoPin 지도 표시", detail: "\(pins.count)개")
+        }
 
         // 보류된 선택 요청이 있으면 새 핀 집합에서 적용 시도.
         applyPendingSelectionIfPossible()
@@ -223,11 +237,15 @@ final class MapViewModel: NSObject, ObservableObject {
     /// 핀 선택/해제하여 하단 카드 표시 제어
     func select(pin: PhotoPin) {
         selectedPin = pin
+        // 3d — 핀 탭 시 썸네일/촬영 정보 상세 카드 표시(selectedPin 바인딩으로 PinCardView 렌더).
+        AchievementLogger.passOnce("3d", "핀 상세 카드 표시", detail: pin.title)
     }
 
     /// 기간 필터를 변경한다. 현재 선택된 핀이 새 필터에 포함되지 않으면 선택을 해제한다 (Req 6.6).
     func applyDateFilter(_ filter: DateRangeFilter) {
         activeDateFilter = filter
+        // 3e — 기간 필터 칩 선택 시 해당 기간 핀만 표시.
+        AchievementLogger.pass("3e", "기간 필터 적용", detail: "\(filter.label) → \(filteredPins.count)/\(pins.count)개")
         if let pin = selectedPin, !filter.includes(pin.createdAt) {
             closeCard()
         }

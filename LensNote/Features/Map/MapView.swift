@@ -311,6 +311,8 @@ struct MapView: View {
                 let avgLon = group.map { $0.longitude }.reduce(0, +) / Double(group.count)
                 let center = CLLocationCoordinate2D(latitude: avgLat, longitude: avgLon)
                 items.append(ClusterItem(id: UUID(), kind: .cluster(center: center, pins: group)))
+                // 3c — 반경 내 2개 이상 핀이 클러스터로 그룹화됨.
+                AchievementLogger.passOnce("3c", "핀 클러스터링", detail: "\(group.count)개 그룹")
             }
         }
         return items

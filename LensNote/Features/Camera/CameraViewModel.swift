@@ -157,7 +157,10 @@ final class CameraViewModel: NSObject, ObservableObject {
     }
 
     func applyConcept() {
-        preset = FilterPreset.forConcept(conceptText)
+        let resolved = FilterPreset.forConcept(conceptText)
+        preset = resolved
+        // 1c — forConcept이 유효한 FilterPreset을 반환.
+        AchievementLogger.pass("1c", "FilterPreset.forConcept", detail: "\(conceptText) → \(resolved.name)")
         // 사용자가 입력한 컨셉을 엔진의 씬 힌트로 전달
         guidanceEngine.updateSceneHint(from: conceptText)
     }
@@ -472,11 +475,17 @@ private extension CameraViewModel {
     /// 기존 Vision 기반 guidanceMessage/overlayState는 건드리지 않는다.
     @MainActor
     func applyInferenceOutput(_ output: AIInferenceOutput) {
+        // 2a — RealTimeInferenceEngine이 라이브 프레임에서 추론 결과를 반환함.
+        AchievementLogger.passOnce("2a", "RealTimeInferenceEngine 추론 결과", detail: "scene=\(output.sceneLabel)")
         sceneLabel = output.sceneLabel
         inferenceScore = output.inferenceScore
         coreMLSubjectBox = output.subjectBoundingBox
         coreMLGuidanceHint = output.guidanceHint
         coachingMessage = makeCoachingMessage(from: output)
+        if coachingMessage != nil {
+            // 2d — 레퍼런스 설정 시 LiveCoachingDelta 코칭 메시지 생성.
+            AchievementLogger.passOnce("2d", "LiveCoachingDelta 코칭 메시지", detail: coachingMessage ?? "")
+        }
         updateActiveGuidanceHint()
     }
 
@@ -552,6 +561,13 @@ private extension CameraViewModel {
 
         activeGuidanceHint = candidate
         activeHintAppliedAt = now
+
+        if let shown = candidate {
+            // 2b — 추론 결과로부터 ActiveGuidanceHint 문자열 생성.
+            AchievementLogger.passOnce("2b", "ActiveGuidanceHint 생성", detail: shown)
+            // 2c — CameraLiveStepView에 구도 안내 배너 노출(activeGuidanceHint 바인딩으로 렌더).
+            AchievementLogger.passOnce("2c", "구도 안내 배너 노출", detail: shown)
+        }
     }
 
     func applyGuidanceResult(_ result: CompositionGuidanceResult) -> Bool {
