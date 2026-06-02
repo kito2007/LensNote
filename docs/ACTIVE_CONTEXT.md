@@ -481,17 +481,25 @@ tasks.md task 9(9.1/9.2) 체크. Build ✅ / Test ✅ 24.
 - property 테스트 6건(8.2 Property 3 / 8.3 Property 4 / 8.5 Property 5).
 tasks.md task 8(8.1~8.5) 체크. Build ✅ / Test ✅ 30.
 
+## Completed Work (2026-06-02 — CoreML/레퍼런스 안전성 Req 10)
+
+이미 충족된 항목 확인(estimateCameraAngle midY fallback 10.2 — 0.35/0.65, thermalState serious×2.8/critical skip 10.6, 두 모델 실패 nil 10.4) + 미비점 보강(1커밋):
+- `DeepLabV3Service`: semanticPredictions shape `[513,513]` 검증 → 불일치 시 `os.Logger` 에러 + nil(Req 10.3). gridSize 상수화.
+- `CameraView`: 레퍼런스 분석을 `referenceAnalysisTask`로 보관 + 각 단계 `Task.isCancelled` 가드. `resetReferenceFlow`(뒤로가기)에서 cancel + 상태 초기화(Req 10.5).
+tasks.md task 12(12.1) 체크. Build ✅ / Test ✅ 31.
+⚠️ 실기기 CoreML 로드(10.1)·VNFaceLandmarks pitch(10.2)는 실기기 QA 잔여.
+
 ## Next Recommended Tasks (in priority order)
 
-> **다음 세션 시작점**: Req 1/2/3/4/5/6/8/9/12 완료. 남은 핵심 기능 거의 소진 — 안전성/지표/체크포인트.
+> **다음 세션 시작점**: Req 1/2/3/4/5/6/8/9/10/12 완료. 거의 마무리 단계.
 > 진행 방침: 작업마다 커밋 분리.
 
 1. **런타임 영속성 통합 검증 (Req 8 잔여)** — camera → save → force-quit → relaunch → map pin 수동 QA(실기기).
-2. **face landmarks pitch 시뮬레이터 한계 모니터링 (Req 10, task 12)** — 실기기 pitch 가능성. 라이브 angle 코칭(Req 1)도 이 추정에 의존. 시뮬레이터 의존 시 cameraAngle midY fallback 검토.
-3. **목표 기능 달성도 평가 지표 (Req 13, task 13)** — 달성도 로그/검증 포인트. 선택적.
-4. **체크포인트 (task 2/6/10/14)** — 빌드/전체 기능 확인 단계(문서적).
+2. **목표 기능 달성도 평가 지표 (Req 11, task 13)** — 달성도 로그/검증 포인트. 선택적(문서/계측 성격).
+3. **체크포인트 (task 2/6/10/14)** — 빌드/전체 기능 확인 단계(문서적).
+4. **실기기 QA 잔여** — Req 10.1(CoreML 5초 내 로드+추론)/10.2(실기기 pitch), Req 6 롤링 필터 체감.
 
-남은 Kiro 태스크: Req 10(task 12 pitch 안전성), Req 13(task 13 지표), 체크포인트(task 2/6/10/14). 핵심 12개 요구사항 중 기능 구현은 대부분 완료.
+핵심 기능 요구사항(Req 1~10, 12) 구현 완료. 남은 건 Req 11(지표, 선택적) + 체크포인트(문서적) + 실기기 수동 QA.
 
 > ⚠️ **라이브 코칭 실기기 검증 잔여 (Req 1)**: 라이브 경로엔 face landmark가 없어 `cameraAngle`은 항상 nil → 현재 coverage 코칭("더 멀리/더 가까이")만 실제 동작. 앵글 코칭은 live ShotRecipe에 앵글이 추정되어야 동작(Req 10 pitch 연동 필요). 코칭 배너 체감/임계값(0.15)은 실기기에서 튜닝 필요.
 

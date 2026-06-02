@@ -187,8 +187,8 @@
     - 디바운스 로직 테스트: 0.9s 미만 미승격, 1.6s 미만 미제거
     - _Requirements: 1.3, 1.6, 1.7_
 
-- [ ] 12. 실기기 CoreML 추론 검증 및 안전성 강화
-  - [ ] 12.1 RealTimeInferenceEngine 안전성 코드 보강
+- [x] 12. 실기기 CoreML 추론 검증 및 안전성 강화
+  - [x] 12.1 RealTimeInferenceEngine 안전성 코드 보강
     - DeepLabV3 MLMultiArray shape [513, 513] 검증 → 불일치 시 에러 로그 + nil 반환
     - CoreML 모델 파일 번들 부재 시 해당 모델 추론 건너뛰기, 두 모델 모두 없으면 nil 반환 (크래시 없음)
     - thermalState serious → 추론 간격 baseInterval × 2.8 이상, critical → 추론 건너뜀 + nil 반환
