@@ -24,6 +24,11 @@ struct SegmentationResult {
     let subjectCoverage: Double
     /// 피사체 중심의 삼등분선 교차점 대비 편차 (정규화 -0.5~0.5).
     let ruleOfThirdsOffset: CGPoint
+    /// person(클래스 15) 마스크 바운딩 박스 (정규화 0~1). 사람 픽셀이 없으면 nil.
+    /// dominantClass가 person이 아니어도(배경 오브젝트가 더 클 때도) 채워진다.
+    let personBoundingBox: CGRect?
+    /// person(클래스 15)이 화면에서 차지하는 면적 비율 (0~1). 사람 없으면 0.
+    let personCoverage: Double
 }
 
 /// DeepLabV3 21개 클래스 레이블.
@@ -164,6 +169,26 @@ final class DeepLabV3Service {
             }
         }
 
+        // person(15) 클래스를 별도로 추출한다 — dominant 클래스가 아니어도(배경 오브젝트가
+        // 더 클 때도) 인물 중심 앱이 사람 마스크를 쓸 수 있도록. (평가셋 003/009처럼 식탁·차가
+        // 사람보다 넓어 dominant가 person이 아닌 경우 미검출되던 문제 해결.)
+        let personClass = DeepLabClass.person.rawValue // 15
+        let personBox: CGRect?
+        let personCoverage: Double
+        if let pCount = classCounts[personClass], pCount > 0,
+           let pMinX = classMinX[personClass], let pMaxX = classMaxX[personClass],
+           let pMinY = classMinY[personClass], let pMaxY = classMaxY[personClass] {
+            let nx = Double(pMinX) / Double(gridSize)
+            let xx = Double(pMaxX) / Double(gridSize)
+            let ny = Double(pMinY) / Double(gridSize)
+            let xy = Double(pMaxY) / Double(gridSize)
+            personBox = CGRect(x: nx, y: ny, width: xx - nx, height: xy - ny)
+            personCoverage = Double(pCount) / Double(max(totalSampled, 1))
+        } else {
+            personBox = nil
+            personCoverage = 0
+        }
+
         // 배경(0) 제외 가장 넓은 클래스 찾기
         let nonBackgroundCounts = classCounts.filter { $0.key != 0 }
         guard let dominantEntry = nonBackgroundCounts.max(by: { $0.value < $1.value }) else {
@@ -173,7 +198,9 @@ final class DeepLabV3Service {
                 dominantClassName: DeepLabClass.background.displayName,
                 subjectBoundingBox: nil,
                 subjectCoverage: 0,
-                ruleOfThirdsOffset: .zero
+                ruleOfThirdsOffset: .zero,
+                personBoundingBox: personBox,
+                personCoverage: personCoverage
             )
         }
 
@@ -209,7 +236,9 @@ final class DeepLabV3Service {
             dominantClassName: className,
             subjectBoundingBox: bbox,
             subjectCoverage: coverage,
-            ruleOfThirdsOffset: CGPoint(x: offsetX, y: offsetY)
+            ruleOfThirdsOffset: CGPoint(x: offsetX, y: offsetY),
+            personBoundingBox: personBox,
+            personCoverage: personCoverage
         )
     }
 }
