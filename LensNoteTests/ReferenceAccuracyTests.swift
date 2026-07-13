@@ -61,6 +61,7 @@ struct ReferenceAccuracyTests {
     private static var labelsURL: URL { evalDir.appendingPathComponent("labels.json") }
     private static var draftURL: URL { evalDir.appendingPathComponent("labels.draft.json") }
     private static var previewsDir: URL { evalDir.appendingPathComponent("_previews") }
+    private static var gtPreviewsDir: URL { evalDir.appendingPathComponent("_previews_gt") }
 
     private static let imageExtensions: Set<String> = ["jpg", "jpeg", "png", "heic"]
 
@@ -202,6 +203,33 @@ struct ReferenceAccuracyTests {
         print("[Eval] 다음: _previews/ 확인 → draft를 labels.json으로 복사 후 틀린 것만 교정 + verified:true.")
     }
 
+    // MARK: - GT 라벨 미리보기 (검수용)
+
+    /// labels.json의 subjectBox를 이미지 위에 파란 박스로 그려 _previews_gt/에 저장한다.
+    /// (분석기 박스가 아니라 손검수 ground-truth를 눈으로 확인하기 위함.)
+    /// 매번 재생성(멱등 아님) — 라벨 교정 후 다시 그려 확인.
+    @Test("GT 라벨 박스 미리보기 생성")
+    func renderLabelPreviews() async throws {
+        guard let data = try? Data(contentsOf: Self.labelsURL),
+              let file = try? JSONDecoder().decode(EvalLabelFile.self, from: data) else {
+            print("[Eval] labels.json 없음 — GT 미리보기 스킵.")
+            return
+        }
+        let fm = FileManager.default
+        try? fm.createDirectory(at: Self.gtPreviewsDir, withIntermediateDirectories: true)
+        var count = 0
+        for label in file.items {
+            let imgURL = Self.referencesDir.appendingPathComponent(label.image)
+            guard let imgData = try? Data(contentsOf: imgURL), let img = UIImage(data: imgData) else { continue }
+            let preview = Self.drawBox(label.subjectBox?.cgRect, on: img, color: .systemBlue)
+            if let out = preview.jpegData(compressionQuality: 0.9) {
+                try? out.write(to: Self.gtPreviewsDir.appendingPathComponent(label.image))
+                count += 1
+            }
+        }
+        print("[Eval] _previews_gt/ GT 박스 미리보기 \(count)건 저장 완료.")
+    }
+
     // MARK: - Helpers
 
     /// 두 정규화 사각형의 IoU.
@@ -222,7 +250,7 @@ struct ReferenceAccuracyTests {
     }
 
     /// 정규화 박스를 이미지 위에 그려 미리보기 이미지를 만든다.
-    private static func drawBox(_ box: CGRect?, on image: UIImage) -> UIImage {
+    private static func drawBox(_ box: CGRect?, on image: UIImage, color: UIColor = .systemGreen) -> UIImage {
         let renderer = UIGraphicsImageRenderer(size: image.size)
         return renderer.image { ctx in
             image.draw(at: .zero)
@@ -233,7 +261,7 @@ struct ReferenceAccuracyTests {
                 width: box.size.width * image.size.width,
                 height: box.size.height * image.size.height
             )
-            ctx.cgContext.setStrokeColor(UIColor.systemGreen.cgColor)
+            ctx.cgContext.setStrokeColor(color.cgColor)
             ctx.cgContext.setLineWidth(max(image.size.width, image.size.height) * 0.006)
             ctx.cgContext.stroke(rect)
         }
