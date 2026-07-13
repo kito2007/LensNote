@@ -519,8 +519,12 @@ tasks.md task 13(13.1) 체크. Build ✅ / Test ✅ 31.
    - ✅ **튜닝 2건 완료 → overall 85.9%** (회귀 없음, 37 테스트 통과):
      - angle fallback 보수화(midY→lowAngle 오탐 제거, eyeLevel 기본): angle 78.3→95.7.
      - presence 근본(person이 dominant 아니어도 person 마스크 우선; DeepLabV3Service에 person 클래스 노출): presence 91.3→**100%**, 이게 4축 동반 상승.
-   - **현재: presence 100 · coverage 65.2 · position 82.6 · angle 95.7 · overall 85.9%.**
-   - **남은 것**: coverage(메트릭 정의 불일치=마스크비율 vs 박스면적 → 하니스 채점식 교체 검토) / position 4건(과대·오프 박스) / angle 023(진짜 highAngle, 얼굴 pitch 필요). 미커밋 상태(커밋 요청 대기).
+   - presence 100 · coverage 65.2 · position 82.6 · angle 95.7 · overall 85.9%.
+   - ✅ **coverage 메트릭 정의 + person 박스 강건화 완료 → overall 90.2%** (커밋 6c5054a, 489898a, 로컬 main 미푸시):
+     - coverage 채점을 **박스면적 vs 박스면적**으로 교체(사용자 결정). 분석기 subjectCoverage=마스크비율이라 박스 GT와 단위 불일치였음 → like-for-like로 교정.
+     - 이 교체가 **DeepLabV3 person 박스 과대(overshoot) 버그**를 드러냄: raw min/max라 스트레이 노이즈 픽셀이 박스를 프레임 전체로 부풀림. `robustBounds`(밀도 기반, trimFraction 0.15)로 강건화 → position 82.6→**95.7%**.
+   - **현재: presence 100 · coverage 69.6 · position 95.7 · angle 95.7 · overall 90.2%.** 37 테스트 통과, 회귀 없음.
+   - **남은 것(우선순위 낮음)**: coverage 잔여 7건(박스-GT 자연 변동, IoU는 대부분 통과) / position 022(1건, 노이즈) / angle 023(진짜 highAngle, 얼굴 pitch 경로 필요·리스크). 깊은 제품 레버 = 라이브 코칭 coverage 일관성(실기기 검증 대상).
    - ⚠️ swift-testing은 `-only-testing`에 스위트(`LensNoteTests/ReferenceAccuracyTests`) 단위로 지정해야 실행됨(개별 @Test 함수 지정 시 0개 실행).
 2. (보류) 데모 준비 / 신규 백로그(필터 추천 고도화) / 실기기 정밀 검증(Req 10.1/10.2).
 
