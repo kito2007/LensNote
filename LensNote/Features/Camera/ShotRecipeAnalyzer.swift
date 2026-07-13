@@ -22,6 +22,10 @@ final class ShotRecipeAnalyzer {
 
     private var deepLabService = DeepLabV3Service()
 
+    /// person 마스크를 피사체로 인정하는 최소 커버리지(샘플 그리드 비율).
+    /// dominant 클래스가 아니어도 이 이상이면 사람을 피사체로 쓴다. 너무 작은 배경 인물은 배제.
+    private static let personSubjectThreshold = 0.03
+
     // MARK: - Public API
 
     /// 이미지 데이터를 분석하여 ShotRecipe를 반환한다. 어떤 입력이 들어와도 크래시 없이 반환.
@@ -41,22 +45,20 @@ final class ShotRecipeAnalyzer {
         // 단계 D — DeepLabV3 person mask
         let segResult = pixelBuffer.flatMap { deepLabService.segment(pixelBuffer: $0) }
 
-        // 피사체 커버리지 — DeepLabV3(person) 우선, fallback: humanBbox 면적
+        // 피사체 커버리지 + 바운딩 박스.
+        // DeepLabV3 person(15) 마스크를 **dominant 클래스 여부와 무관하게** 우선한다 —
+        // 인물 중심 앱이므로 식탁·차 등 배경 오브젝트가 사람보다 넓어도 사람이 피사체다.
+        // (평가셋 003 식탁/009 차: 사람이 dominant가 아니라 통째로 미검출되던 문제 해결.)
+        // person 마스크 없거나 너무 작으면 VNHumanRectangles 박스로 fallback, 그것도 없으면 nil.
         let subjectCoverage: Double?
-        if let seg = segResult, seg.dominantClass == 15 {
-            subjectCoverage = seg.subjectCoverage
+        let subjectBBox: CodableRect?
+        if let seg = segResult, let personBox = seg.personBoundingBox,
+           seg.personCoverage >= Self.personSubjectThreshold {
+            // DeepLabV3 person 박스는 postprocess에서 이미 top-left origin.
+            subjectCoverage = seg.personCoverage
+            subjectBBox = CodableRect(personBox)
         } else if let human = humanResult {
             subjectCoverage = Double(human.boundingBox.width * human.boundingBox.height)
-        } else {
-            subjectCoverage = nil
-        }
-
-        // 피사체 바운딩 박스 (Vision = bottom-left origin → top-left 변환)
-        let subjectBBox: CodableRect?
-        if let seg = segResult, seg.dominantClass == 15, let segBox = seg.subjectBoundingBox {
-            // DeepLabV3 박스는 postprocess에서 이미 top-left origin (row/col 순회 기준)
-            subjectBBox = CodableRect(segBox)
-        } else if let human = humanResult {
             // Vision bounding box는 bottom-left origin → flip Y
             let vb = human.boundingBox
             let flipped = CGRect(x: vb.origin.x,
@@ -65,6 +67,7 @@ final class ShotRecipeAnalyzer {
                                  height: vb.height)
             subjectBBox = CodableRect(flipped)
         } else {
+            subjectCoverage = nil
             subjectBBox = nil
         }
 
@@ -217,15 +220,20 @@ final class ShotRecipeAnalyzer {
 
     // MARK: - Camera angle fallback (no face)
 
-    /// 얼굴 미검출 시 사람 박스 위치(top-left origin)로 앵글을 추정한다.
-    /// - midY < 0.35  → .highAngle
-    /// - midY > 0.65  → .lowAngle
-    /// - else          → .eyeLevel (중앙 범위에서 사람이 화면 중앙에 있으면 eye-level 추정이 합리적)
+    /// 얼굴(pitch) 미검출 시 앵글 추정.
+    ///
+    /// 이전 구현은 사람 박스의 수직 위치(midY)로 low/high angle을 추정했으나,
+    /// **박스 위치는 카메라 앵글의 신뢰할 수 있는 단서가 아니다** — 전신/반신샷은 사람이
+    /// 프레임 하단을 자연히 채워 midY>0.65가 되고(→ 잘못된 lowAngle), 멀리 선 인물은
+    /// 상단에 작게 잡혀 midY<0.35가 된다(→ 잘못된 highAngle). 평가셋(2026-07-13)에서
+    /// 이 규칙이 eyeLevel 전신샷을 lowAngle로 오분류하는 주 원인으로 확인됨.
+    ///
+    /// 따라서 얼굴 pitch라는 실제 앵글 근거가 없으면 위치로 추측하지 않고 **중립값
+    /// eyeLevel**로 둔다(대부분의 사진이 eye-level이고, 잘못된 low/high angle 코칭보다
+    /// "앵글 보정 없음"이 안전). 진짜 low/high angle 판별은 얼굴 pitch가 필요.
+    /// footShot 등 스타일 판정은 classifyStyle이 자체 midY 조건을 가지므로 영향 없음.
     private func estimateCameraAngle(from bbox: CodableRect?) -> CameraAngle? {
-        guard let box = bbox else { return nil }
-        let midY = box.y + box.height / 2.0
-        if midY < 0.35 { return .highAngle }
-        if midY > 0.65 { return .lowAngle }
+        guard bbox != nil else { return nil }
         return .eyeLevel
     }
 

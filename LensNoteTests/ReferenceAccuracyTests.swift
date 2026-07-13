@@ -61,6 +61,7 @@ struct ReferenceAccuracyTests {
     private static var labelsURL: URL { evalDir.appendingPathComponent("labels.json") }
     private static var draftURL: URL { evalDir.appendingPathComponent("labels.draft.json") }
     private static var previewsDir: URL { evalDir.appendingPathComponent("_previews") }
+    private static var gtPreviewsDir: URL { evalDir.appendingPathComponent("_previews_gt") }
 
     private static let imageExtensions: Set<String> = ["jpg", "jpeg", "png", "heic"]
 
@@ -103,8 +104,13 @@ struct ReferenceAccuracyTests {
             // coverage / position — 양쪽 다 박스 있을 때만 평가
             var coverageOK = false, positionOK = false
             if let pred = recipe.subjectBoundingBox?.cgRect, let lbl = label.subjectBox {
-                let predCoverage = recipe.subjectCoverage ?? Double(pred.width * pred.height)
-                coverageOK = abs(predCoverage - lbl.area) <= file.tolerances.coverage
+                // coverage는 **박스 면적 vs 박스 면적**으로 채점한다.
+                // 분석기 subjectCoverage는 person 마스크 픽셀비율(경로에 따라 박스면적)이라
+                // 박스 GT(subjectBox)와 단위가 다르다(마스크 ⊆ 박스라 구조적으로 마스크비율 ≤ 박스면적).
+                // 손라벨한 GT는 박스뿐이므로, 분석기 박스 면적을 라벨 박스 면적과 비교해
+                // "피사체 크기 추정" 오차를 like-for-like로 측정한다. (마스크비율 GT는 미보유.)
+                let predArea = Double(pred.width * pred.height)
+                coverageOK = abs(predArea - lbl.area) <= file.tolerances.coverage
                 positionOK = Self.iou(pred, lbl.cgRect) >= file.tolerances.iou
             } else if !labelHasBox && !predHasBox {
                 // 둘 다 사람 없음 → 박스 축은 해당 없음(정답으로 간주).
@@ -119,7 +125,9 @@ struct ReferenceAccuracyTests {
             let angleOK = predAngle == label.cameraAngle
             if angleOK { angle += 1 }
 
-            lines.append("  \(presenceOK ? "✅" : "❌")P \(coverageOK ? "✅" : "❌")C \(positionOK ? "✅" : "❌")I \(angleOK ? "✅" : "❌")A  \(label.image)  pred(box=\(predHasBox), cov=\(recipe.subjectCoverage.map { String(format: "%.2f", $0) } ?? "nil"), angle=\(predAngle ?? "nil"))")
+            let predAreaStr = recipe.subjectBoundingBox.map { String(format: "%.2f", $0.cgRect.width * $0.cgRect.height) } ?? "nil"
+            let lblAreaStr = label.subjectBox.map { String(format: "%.2f", $0.area) } ?? "nil"
+            lines.append("  \(presenceOK ? "✅" : "❌")P \(coverageOK ? "✅" : "❌")C \(positionOK ? "✅" : "❌")I \(angleOK ? "✅" : "❌")A  \(label.image)  pred(box=\(predHasBox), area=\(predAreaStr) vs \(lblAreaStr), mask=\(recipe.subjectCoverage.map { String(format: "%.2f", $0) } ?? "nil"), angle=\(predAngle ?? "nil"))")
         }
 
         func pct(_ n: Int) -> String { scored == 0 ? "-" : String(format: "%.1f%%", Double(n) / Double(scored) * 100) }
@@ -202,6 +210,33 @@ struct ReferenceAccuracyTests {
         print("[Eval] 다음: _previews/ 확인 → draft를 labels.json으로 복사 후 틀린 것만 교정 + verified:true.")
     }
 
+    // MARK: - GT 라벨 미리보기 (검수용)
+
+    /// labels.json의 subjectBox를 이미지 위에 파란 박스로 그려 _previews_gt/에 저장한다.
+    /// (분석기 박스가 아니라 손검수 ground-truth를 눈으로 확인하기 위함.)
+    /// 매번 재생성(멱등 아님) — 라벨 교정 후 다시 그려 확인.
+    @Test("GT 라벨 박스 미리보기 생성")
+    func renderLabelPreviews() async throws {
+        guard let data = try? Data(contentsOf: Self.labelsURL),
+              let file = try? JSONDecoder().decode(EvalLabelFile.self, from: data) else {
+            print("[Eval] labels.json 없음 — GT 미리보기 스킵.")
+            return
+        }
+        let fm = FileManager.default
+        try? fm.createDirectory(at: Self.gtPreviewsDir, withIntermediateDirectories: true)
+        var count = 0
+        for label in file.items {
+            let imgURL = Self.referencesDir.appendingPathComponent(label.image)
+            guard let imgData = try? Data(contentsOf: imgURL), let img = UIImage(data: imgData) else { continue }
+            let preview = Self.drawBox(label.subjectBox?.cgRect, on: img, color: .systemBlue)
+            if let out = preview.jpegData(compressionQuality: 0.9) {
+                try? out.write(to: Self.gtPreviewsDir.appendingPathComponent(label.image))
+                count += 1
+            }
+        }
+        print("[Eval] _previews_gt/ GT 박스 미리보기 \(count)건 저장 완료.")
+    }
+
     // MARK: - Helpers
 
     /// 두 정규화 사각형의 IoU.
@@ -222,7 +257,7 @@ struct ReferenceAccuracyTests {
     }
 
     /// 정규화 박스를 이미지 위에 그려 미리보기 이미지를 만든다.
-    private static func drawBox(_ box: CGRect?, on image: UIImage) -> UIImage {
+    private static func drawBox(_ box: CGRect?, on image: UIImage, color: UIColor = .systemGreen) -> UIImage {
         let renderer = UIGraphicsImageRenderer(size: image.size)
         return renderer.image { ctx in
             image.draw(at: .zero)
@@ -233,7 +268,7 @@ struct ReferenceAccuracyTests {
                 width: box.size.width * image.size.width,
                 height: box.size.height * image.size.height
             )
-            ctx.cgContext.setStrokeColor(UIColor.systemGreen.cgColor)
+            ctx.cgContext.setStrokeColor(color.cgColor)
             ctx.cgContext.setLineWidth(max(image.size.width, image.size.height) * 0.006)
             ctx.cgContext.stroke(rect)
         }

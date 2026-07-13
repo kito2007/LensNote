@@ -21,7 +21,9 @@ struct AIInferenceAggregatorTests {
             dominantClassName: "background",
             subjectBoundingBox: CGRect(x: 0, y: 0, width: 0.1, height: 0.1),
             subjectCoverage: 0.1,
-            ruleOfThirdsOffset: CGPoint(x: 0.5, y: 0.0) // |offset|=0.5 → compositionScore 0
+            ruleOfThirdsOffset: CGPoint(x: 0.5, y: 0.0), // |offset|=0.5 → compositionScore 0
+            personBoundingBox: nil,
+            personCoverage: 0
         )
 
         let output = AIInferenceAggregator.aggregate(scene: scene, segmentation: seg)
@@ -38,7 +40,9 @@ struct AIInferenceAggregatorTests {
             dominantClassName: "background",
             subjectBoundingBox: CGRect(x: 0.4, y: 0.4, width: 0.2, height: 0.2),
             subjectCoverage: 0.2,
-            ruleOfThirdsOffset: .zero // 편차 0 → compositionScore 1.0
+            ruleOfThirdsOffset: .zero, // 편차 0 → compositionScore 1.0
+            personBoundingBox: nil,
+            personCoverage: 0
         )
 
         let output = AIInferenceAggregator.aggregate(scene: scene, segmentation: seg)
