@@ -76,7 +76,7 @@ EvalAssets/
 | 축 | 정답 조건 |
 |---|---|
 | **presence** | 분석기 박스 유무 == 라벨 박스 유무 (사람 검출 여부) |
-| **coverage** | \|분석기 subjectCoverage − 라벨 박스 면적\| ≤ `tolerances.coverage` |
+| **coverage** | \|분석기 박스 면적 − 라벨 박스 면적\| ≤ `tolerances.coverage` (박스 vs 박스 like-for-like. 분석기 `subjectCoverage`는 마스크비율이라 박스 GT와 단위 불일치 → 박스 면적으로 채점) |
 | **position(IoU)** | IoU(분석기 박스, 라벨 박스) ≥ `tolerances.iou` |
 | **angle** | 분석기 cameraAngle == 라벨 cameraAngle |
 

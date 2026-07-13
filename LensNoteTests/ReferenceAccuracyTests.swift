@@ -104,8 +104,13 @@ struct ReferenceAccuracyTests {
             // coverage / position — 양쪽 다 박스 있을 때만 평가
             var coverageOK = false, positionOK = false
             if let pred = recipe.subjectBoundingBox?.cgRect, let lbl = label.subjectBox {
-                let predCoverage = recipe.subjectCoverage ?? Double(pred.width * pred.height)
-                coverageOK = abs(predCoverage - lbl.area) <= file.tolerances.coverage
+                // coverage는 **박스 면적 vs 박스 면적**으로 채점한다.
+                // 분석기 subjectCoverage는 person 마스크 픽셀비율(경로에 따라 박스면적)이라
+                // 박스 GT(subjectBox)와 단위가 다르다(마스크 ⊆ 박스라 구조적으로 마스크비율 ≤ 박스면적).
+                // 손라벨한 GT는 박스뿐이므로, 분석기 박스 면적을 라벨 박스 면적과 비교해
+                // "피사체 크기 추정" 오차를 like-for-like로 측정한다. (마스크비율 GT는 미보유.)
+                let predArea = Double(pred.width * pred.height)
+                coverageOK = abs(predArea - lbl.area) <= file.tolerances.coverage
                 positionOK = Self.iou(pred, lbl.cgRect) >= file.tolerances.iou
             } else if !labelHasBox && !predHasBox {
                 // 둘 다 사람 없음 → 박스 축은 해당 없음(정답으로 간주).
@@ -120,7 +125,9 @@ struct ReferenceAccuracyTests {
             let angleOK = predAngle == label.cameraAngle
             if angleOK { angle += 1 }
 
-            lines.append("  \(presenceOK ? "✅" : "❌")P \(coverageOK ? "✅" : "❌")C \(positionOK ? "✅" : "❌")I \(angleOK ? "✅" : "❌")A  \(label.image)  pred(box=\(predHasBox), cov=\(recipe.subjectCoverage.map { String(format: "%.2f", $0) } ?? "nil"), angle=\(predAngle ?? "nil"))")
+            let predAreaStr = recipe.subjectBoundingBox.map { String(format: "%.2f", $0.cgRect.width * $0.cgRect.height) } ?? "nil"
+            let lblAreaStr = label.subjectBox.map { String(format: "%.2f", $0.area) } ?? "nil"
+            lines.append("  \(presenceOK ? "✅" : "❌")P \(coverageOK ? "✅" : "❌")C \(positionOK ? "✅" : "❌")I \(angleOK ? "✅" : "❌")A  \(label.image)  pred(box=\(predHasBox), area=\(predAreaStr) vs \(lblAreaStr), mask=\(recipe.subjectCoverage.map { String(format: "%.2f", $0) } ?? "nil"), angle=\(predAngle ?? "nil"))")
         }
 
         func pct(_ n: Int) -> String { scored == 0 ? "-" : String(format: "%.1f%%", Double(n) / Double(scored) * 100) }
