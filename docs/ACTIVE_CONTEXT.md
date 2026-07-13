@@ -514,7 +514,14 @@ tasks.md task 13(13.1) 체크. Build ✅ / Test ✅ 31.
 
 > **다음 세션 시작점(우선): 카메라 구도 코칭 품질 측정·튜닝(B+C 전략).** 상세 맥락은 메모리 `camera-quality-eval.md` + `docs/REFERENCE_EVAL.md`.
 
-1. **레퍼런스 인식 정확도 측정 시작** — ⏳ **사용자가 `EvalAssets/references/`에 레퍼런스 20~30장(인물 위주) 투입 대기 중.** 투입되면: ① `generateLabelDrafts` 실행(초안+`_previews/` 박스 그림) → ② 사용자 검수로 `labels.json` 확정 → ③ `scoreAccuracy`로 presence/coverage/position/angle 베이스라인 % → ④ 최저 축(특히 angle)부터 `ShotRecipeAnalyzer` 룰 튜닝 → 재측정 반복.
+1. **레퍼런스 인식 정확도 — ✅ 베이스라인 측정 완료(2026-07-13).** 레퍼런스 23장 투입 → `generateLabelDrafts` → 23장 시각검수 → ground-truth `labels.json` 작성 → `renderLabelPreviews`(신규, GT 박스를 `_previews_gt/`에 렌더) 자기검증 → `scoreAccuracy`.
+   - 베이스라인: presence 91.3 · coverage 56.5 · position 73.9 · angle 78.3 · overall **75.0%**. (마스터 브리프 Phase 0)
+   - ✅ **튜닝 2건 완료 → overall 85.9%** (회귀 없음, 37 테스트 통과):
+     - angle fallback 보수화(midY→lowAngle 오탐 제거, eyeLevel 기본): angle 78.3→95.7.
+     - presence 근본(person이 dominant 아니어도 person 마스크 우선; DeepLabV3Service에 person 클래스 노출): presence 91.3→**100%**, 이게 4축 동반 상승.
+   - **현재: presence 100 · coverage 65.2 · position 82.6 · angle 95.7 · overall 85.9%.**
+   - **남은 것**: coverage(메트릭 정의 불일치=마스크비율 vs 박스면적 → 하니스 채점식 교체 검토) / position 4건(과대·오프 박스) / angle 023(진짜 highAngle, 얼굴 pitch 필요). 미커밋 상태(커밋 요청 대기).
+   - ⚠️ swift-testing은 `-only-testing`에 스위트(`LensNoteTests/ReferenceAccuracyTests`) 단위로 지정해야 실행됨(개별 @Test 함수 지정 시 0개 실행).
 2. (보류) 데모 준비 / 신규 백로그(필터 추천 고도화) / 실기기 정밀 검증(Req 10.1/10.2).
 
 > ⚠️ **라이브 코칭 한계**: 라이브 경로엔 face landmark가 없어 `cameraAngle`은 항상 nil → 현재 coverage 코칭만 실제 동작. angle 코칭 활성화는 라이브 프레임 사람 검출/앵글 추정 구현 필요(Req 10 pitch 연동). 평가에서 angle 축이 낮게 나오는 것과 직결.
