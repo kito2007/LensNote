@@ -526,9 +526,17 @@ tasks.md task 13(13.1) 체크. Build ✅ / Test ✅ 31.
    - **현재: presence 100 · coverage 69.6 · position 95.7 · angle 95.7 · overall 90.2%.** 37 테스트 통과, 회귀 없음.
    - **남은 것(우선순위 낮음)**: coverage 잔여 7건(박스-GT 자연 변동, IoU는 대부분 통과) / position 022(1건, 노이즈) / angle 023(진짜 highAngle, 얼굴 pitch 경로 필요·리스크). 깊은 제품 레버 = 라이브 코칭 coverage 일관성(실기기 검증 대상).
    - ⚠️ swift-testing은 `-only-testing`에 스위트(`LensNoteTests/ReferenceAccuracyTests`) 단위로 지정해야 실행됨(개별 @Test 함수 지정 시 0개 실행).
-2. (보류) 데모 준비 / 신규 백로그(필터 추천 고도화) / 실기기 정밀 검증(Req 10.1/10.2).
+   - ✅ **PR #5로 main 반영 완료** (merge commit `e9917ac`, overall 90.2%). angle 축은 여기서 종료(023은 pitch 경로 필요, 값싼 튜닝 불가).
+2. (보류) 데모 준비 / 신규 백로그(필터 추천 고도화, **줌/화각 재현 코칭** 신규 추가) / 실기기 정밀 검증(Req 10.1/10.2).
 
-> ⚠️ **라이브 코칭 한계**: 라이브 경로엔 face landmark가 없어 `cameraAngle`은 항상 nil → 현재 coverage 코칭만 실제 동작. angle 코칭 활성화는 라이브 프레임 사람 검출/앵글 추정 구현 필요(Req 10 pitch 연동). 평가에서 angle 축이 낮게 나오는 것과 직결.
+## 브랜치 워크플로우 (2026-07-13 변경)
+
+- **main-only → `dev` 작업 + `dev→main` PR**("적당히 기능 모이면"). **앞으로 모든 작업은 `dev`에서.**
+- 현재: `main`=e9917ac(origin 동기화, PR #5 머지됨) / `dev`=d00e10b(main 포함 + 백로그 docs 커밋 1개 앞섬, ff 가능). 다음 작업이 dev에 쌓이고 다음 PR에 백로그 커밋도 실림.
+- **PR 규칙**: PR = 테마("하나의 이야기") 단위(커밋보다 굵게, 테마 안 섞음). 안정 체크포인트에서 컷. 머지 = **merge commit**(squash 아님, 논리커밋 히스토리 보존) → 머지 후 dev를 main 위로 rebase 정렬.
+- ⚠️ **PR 생성 전 반드시 `git push`** — PR은 origin/dev 상태를 담음(이번에 백로그 커밋이 push 전 PR 생성으로 누락됨, 사후 rebase로 복구).
+
+> ⚠️ **라이브 코칭 한계**: 라이브 경로엔 face landmark가 없어 `cameraAngle`은 항상 nil → 현재 coverage 코칭만 실제 동작. angle 코칭 활성화는 라이브 프레임 사람 검출/앵글 추정 구현 필요(Req 10 pitch 연동). 평가에서 angle 축이 낮게 나오는 것과 직결. **줌/화각 재현 코칭(백로그)도 라이브 화각 추정 필요 — 같은 실기기 검증 계열.**
 > 위임 원칙(사용자 확인): UI/UX 최종 판단은 사용자, Claude는 시안·구현·반복. 모호한 기능은 "예시+체크가능한 성공기준"으로 위임. 상세 [[camera-quality-eval]].
 
 ## Verification Status
