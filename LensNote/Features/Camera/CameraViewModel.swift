@@ -11,50 +11,8 @@ import Foundation
 import Combine
 import AVFoundation
 import UIKit
+import CoreImage
 import CoreLocation
-
-struct FilterPreset: Equatable {
-    let name: String
-    let exposure: Double
-    let contrast: Double
-    let saturation: Double
-    let temperature: Double
-    let vignette: Double
-}
-
-extension FilterPreset {
-    static let standard = FilterPreset(name: "Standard", exposure: 0, contrast: 0, saturation: 0, temperature: 0, vignette: 0)
-
-    /// 컨셉 문자열에 기반한 필터 프리셋을 결정한다.
-    /// 뷰 미리보기와 뷰모델 적용이 동일한 룰을 공유하도록 단일 소스로 유지.
-    static func forConcept(_ text: String) -> FilterPreset {
-        let keyword = text.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        guard !keyword.isEmpty else { return .standard }
-
-        if keyword.contains("무드") || keyword.contains("시네마") || keyword.contains("cinematic") {
-            return FilterPreset(name: "Cinematic", exposure: -0.1, contrast: 0.25, saturation: -0.05, temperature: -0.05, vignette: 0.4)
-        }
-        if keyword.contains("빈티지") || keyword.contains("필름") || keyword.contains("vintage") {
-            return FilterPreset(name: "Vintage", exposure: 0.05, contrast: -0.1, saturation: -0.15, temperature: 0.15, vignette: 0.35)
-        }
-        if keyword.contains("야경") || keyword.contains("밤") || keyword.contains("night") {
-            return FilterPreset(name: "Night Mood", exposure: -0.15, contrast: 0.30, saturation: -0.10, temperature: -0.10, vignette: 0.45)
-        }
-        if keyword.contains("인물") || keyword.contains("portrait") {
-            return FilterPreset(name: "Portrait", exposure: 0.05, contrast: 0.08, saturation: 0.12, temperature: 0.12, vignette: 0.15)
-        }
-        if keyword.contains("풍경") || keyword.contains("landscape") {
-            return FilterPreset(name: "Landscape", exposure: 0.02, contrast: 0.18, saturation: 0.20, temperature: -0.02, vignette: 0.10)
-        }
-        if keyword.contains("따뜻") || keyword.contains("warm") {
-            return FilterPreset(name: "Warm", exposure: 0.1, contrast: 0.1, saturation: 0.1, temperature: 0.2, vignette: 0.2)
-        }
-        if keyword.contains("차가") || keyword.contains("cool") {
-            return FilterPreset(name: "Cool", exposure: 0.0, contrast: 0.1, saturation: 0.05, temperature: -0.2, vignette: 0.15)
-        }
-        return .standard
-    }
-}
 
 @MainActor
 final class CameraViewModel: NSObject, ObservableObject {
@@ -113,6 +71,8 @@ final class CameraViewModel: NSObject, ObservableObject {
     private let sampleBufferQueue = DispatchQueue(label: "CameraSampleBufferQueue")
     private let videoOutput = AVCaptureVideoDataOutput()
     private let photoOutput = AVCapturePhotoOutput()
+    // Path A(저장 사진 필터 적용)용 재사용 렌더 컨텍스트. GPU 렌더.
+    private let filterRenderContext = CIContext(options: [.useSoftwareRenderer: false])
     // 카메라 프레임 -> 구도 가이드 결과를 만드는 엔진
     private nonisolated(unsafe) let guidanceEngine = CompositionGuidanceEngine()
     // CoreML 실시간 AI 추론 엔진 (MobileNetV2 + DeepLabV3)
@@ -267,8 +227,11 @@ final class CameraViewModel: NSObject, ObservableObject {
     func saveCapturedImage(_ image: UIImage, coordinate: GeoCoordinate? = nil) {
         let resolvedCoordinate = coordinate ?? locationProvider.latestCoordinate
         let shotStyle = referenceRecipe?.detectedStyle
+        // Phase 1 Path A — 활성 프리셋의 색보정을 저장 사진에 실제 적용(R1).
+        // 프리셋 nil/중립이면 원본 그대로 통과(R5). 썸네일도 동일 이미지로 WYSIWYG(R3).
+        let outputImage = renderedImageApplyingPreset(to: image)
         do {
-            let filePath = try persistImageToDocuments(image)
+            let filePath = try persistImageToDocuments(outputImage)
             let saved = try savePhotoUseCase.execute(
                 imagePath: filePath,
                 coordinate: resolvedCoordinate,
@@ -284,7 +247,7 @@ final class CameraViewModel: NSObject, ObservableObject {
             // Req 2 — 저장 성공 시 결과 카드 정보 구성 + 역지오코딩 시작.
             captureResult = CaptureResultInfo(
                 photoID: saved.id,
-                thumbnail: image,
+                thumbnail: outputImage,
                 placeName: resolvedCoordinate == nil ? nil : "위치 확인 중…",
                 filterPresetName: preset?.name,
                 shotStyleLabel: shotStyle.map { $0.koreanDescription },
@@ -416,6 +379,39 @@ final class CameraViewModel: NSObject, ObservableObject {
                 self.isSessionConfigured = true
                 continuation.resume()
             }
+        }
+    }
+
+    /// 활성 프리셋의 색보정 체인을 이미지에 실제 적용해 반환한다(Path A).
+    /// 프리셋이 nil이거나 중립(전부 0)이면 원본을 그대로 반환한다(R5, no-op).
+    /// 렌더 실패 시에도 원본으로 graceful fallback(크래시 금지).
+    private func renderedImageApplyingPreset(to image: UIImage) -> UIImage {
+        guard let preset, !preset.isNeutral else { return image }
+        guard let cgImage = image.cgImage else { return image }
+
+        // UIImage.imageOrientation을 픽셀에 굽고 필터 적용 → 결과는 .up 방향.
+        let orientedInput = CIImage(cgImage: cgImage)
+            .oriented(Self.cgOrientation(from: image.imageOrientation))
+        let output = FilterChainBuilder.makeChain(from: preset)(orientedInput)
+
+        guard let renderedCG = filterRenderContext.createCGImage(output, from: output.extent) else {
+            return image
+        }
+        return UIImage(cgImage: renderedCG, scale: image.scale, orientation: .up)
+    }
+
+    /// UIImage.Orientation → CGImagePropertyOrientation 변환(CIImage.oriented용).
+    private static func cgOrientation(from orientation: UIImage.Orientation) -> CGImagePropertyOrientation {
+        switch orientation {
+        case .up: return .up
+        case .down: return .down
+        case .left: return .left
+        case .right: return .right
+        case .upMirrored: return .upMirrored
+        case .downMirrored: return .downMirrored
+        case .leftMirrored: return .leftMirrored
+        case .rightMirrored: return .rightMirrored
+        @unknown default: return .up
         }
     }
 
