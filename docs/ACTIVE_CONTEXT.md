@@ -510,9 +510,29 @@ tasks.md task 13(13.1) 체크. Build ✅ / Test ✅ 31.
 - **카메라 품질 평가 하니스(커밋 bc89464, B+C 전략 1단계)**: "좋은 구도"라는 주관 → "레퍼런스 재현 정확도" 측정으로 전환. `EvalAssets/`(레포 루트), `LensNoteTests/ReferenceAccuracyTests`(`generateLabelDrafts`/`scoreAccuracy`, 시뮬레이터가 호스트 경로 직접 읽음), `docs/REFERENCE_EVAL.md`. 자세한 맥락은 메모리 [[camera-quality-eval]].
 - 자동화 테스트 **36개 통과(10 suite)**.
 
+## Completed Work (2026-07-14 — Phase 1 Path A: 필터 실제 적용)
+
+마스터 위임 브리프(`GOALS DOCS/lensnote-master-delegation-brief.md`) 로드맵의 **Phase 1(필터 실제 적용, B)** 착수. 스펙 `GOALS DOCS/filter-application-spec.md`의 **Path A(저장 사진 적용, 저위험)** 완료. Path B(MTKView 라이브 프리뷰)는 별도 PR로 분리(실기기 성능 게이트).
+
+1. **T1 — FilterPreset 도메인 승격 + FilterChainBuilder**
+   - `FilterPreset`(struct + `.standard` + `forConcept`)을 `CameraViewModel.swift` → `Domain/Entities/FilterPreset.swift`로 이동. 같은 모듈이라 참조부 변경 불필요. `isNeutral`(전부 0) computed 추가(no-op 판정).
+   - `Features/Camera/FilterChainBuilder.swift` 신설 — 순수 `enum`. `makeChain(from:) -> (CIImage) -> CIImage`. 체인: Exposure→TemperatureAndTint→ColorControls(contrast+saturation)→Vignette, 마지막에 원본 extent로 크롭. 중립 프리셋이면 항등 함수 반환(R5).
+   - **캘리브레이션 상수**: evScale 2.0 / temperatureScale 3000 / vignetteScale 1.5 / neutral 6500K.
+   - ⚠️ **temperature 부호 교정**: 스펙 §5.1 초안은 `targetNeutral = 6500 + temp*k`(양수=따뜻)였으나 `CITemperatureAndTint`는 targetNeutral 색온도를 **올리면 오히려 차가워짐**(보정 방향 반대). → `6500 - temp*scale`로 뒤집어 양수=따뜻 확정. 테스트로 검증.
+   - `LensNoteTests/FilterChainBuilderTests` 6건: no-op(P1)/isNeutral/exposure 밝기↑/saturation spread↑/contrast 밝은픽셀↑/temperature 따뜻(R-B)↑. 단색 CIImage 렌더 후 픽셀 샘플링 방식.
+
+2. **T2 — Path A: 저장 사진에 실제 적용 (R1, R5)**
+   - `CameraViewModel`에 `import CoreImage` + 재사용 `filterRenderContext = CIContext(useSoftwareRenderer:false)`.
+   - `renderedImageApplyingPreset(to:)` 헬퍼: preset nil/중립이면 원본 통과, 아니면 UIImage → CGImage → `CIImage.oriented`(imageOrientation 픽셀에 굽기) → 체인 → `createCGImage` → `UIImage(.up)`. 렌더 실패 시 원본 fallback(크래시 금지). `cgOrientation(from:)` 매핑 헬퍼 추가.
+   - `saveCapturedImage`가 저장 파일·결과 카드 썸네일 **둘 다** `outputImage`(필터 적용본) 사용 → WYSIWYG(R3).
+
+Build: ✅ BUILD SUCCEEDED / Test: ✅ **43 tests / 11 suites 통과**(기존 37 +6), 회귀 없음. 시뮬레이터 카메라 피드 없음 → 실제 촬영 저장물 색보정 반영은 실기기 QA 잔여.
+
 ## Next Recommended Tasks
 
-> **다음 세션 시작점(우선): 카메라 구도 코칭 품질 측정·튜닝(B+C 전략).** 상세 맥락은 메모리 `camera-quality-eval.md` + `docs/REFERENCE_EVAL.md`.
+> **다음 세션 시작점(우선): Phase 1 Path B — MTKView 라이브 프리뷰 필터 적용.** 스펙 `GOALS DOCS/filter-application-spec.md` T3~T5. 실기기 성능 게이트(≥30fps) 필수. `AVCaptureVideoPreviewLayer` → `MTKView(CIContext(mtlDevice:))` 교체, `captureOutput` 버퍼에 동일 `FilterChainBuilder` 체인 적용, grid/FramingGuide/AIDynamicAlignment 오버레이·orientation·aspectFill 재배치. CoreML 0.5s 스로틀은 분리 유지.
+>
+> Path B 이후 로드맵: **Phase 2(앨범 그룹핑, 로컬 키스톤)** → Phase 3(별자리 라인) → Phase 4(공유, design-first/백엔드 게이트). 상세는 `GOALS DOCS/lensnote-master-delegation-brief.md`.
 
 1. **레퍼런스 인식 정확도 — ✅ 베이스라인 측정 완료(2026-07-13).** 레퍼런스 23장 투입 → `generateLabelDrafts` → 23장 시각검수 → ground-truth `labels.json` 작성 → `renderLabelPreviews`(신규, GT 박스를 `_previews_gt/`에 렌더) 자기검증 → `scoreAccuracy`.
    - 베이스라인: presence 91.3 · coverage 56.5 · position 73.9 · angle 78.3 · overall **75.0%**. (마스터 브리프 Phase 0)
