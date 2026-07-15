@@ -510,9 +510,9 @@ tasks.md task 13(13.1) 체크. Build ✅ / Test ✅ 31.
 - **카메라 품질 평가 하니스(커밋 bc89464, B+C 전략 1단계)**: "좋은 구도"라는 주관 → "레퍼런스 재현 정확도" 측정으로 전환. `EvalAssets/`(레포 루트), `LensNoteTests/ReferenceAccuracyTests`(`generateLabelDrafts`/`scoreAccuracy`, 시뮬레이터가 호스트 경로 직접 읽음), `docs/REFERENCE_EVAL.md`. 자세한 맥락은 메모리 [[camera-quality-eval]].
 - 자동화 테스트 **36개 통과(10 suite)**.
 
-## Completed Work (2026-07-14 — Phase 1 Path A: 필터 실제 적용)
+## Completed Work (2026-07-14~15 — Phase 1: 필터 실제 적용, Path A + Path B)
 
-마스터 위임 브리프(`GOALS DOCS/lensnote-master-delegation-brief.md`) 로드맵의 **Phase 1(필터 실제 적용, B)** 착수. 스펙 `GOALS DOCS/filter-application-spec.md`의 **Path A(저장 사진 적용, 저위험)** 완료. Path B(MTKView 라이브 프리뷰)는 별도 PR로 분리(실기기 성능 게이트).
+마스터 위임 브리프(`GOALS DOCS/lensnote-master-delegation-brief.md`) 로드맵의 **Phase 1(필터 실제 적용, B)** 구현. 스펙 `GOALS DOCS/filter-application-spec.md`의 **Path A(저장 사진 적용) + Path B(MTKView 라이브 프리뷰)** 코드 완료. 하나의 `dev→main` PR로 묶음(사용자 결정). 실기기 성능/시각 게이트(T5)는 사용자 QA 잔여.
 
 1. **T1 — FilterPreset 도메인 승격 + FilterChainBuilder**
    - `FilterPreset`(struct + `.standard` + `forConcept`)을 `CameraViewModel.swift` → `Domain/Entities/FilterPreset.swift`로 이동. 같은 모듈이라 참조부 변경 불필요. `isNeutral`(전부 0) computed 추가(no-op 판정).
@@ -528,11 +528,21 @@ tasks.md task 13(13.1) 체크. Build ✅ / Test ✅ 31.
 
 Build: ✅ BUILD SUCCEEDED / Test: ✅ **43 tests / 11 suites 통과**(기존 37 +6), 회귀 없음. 시뮬레이터 카메라 피드 없음 → 실제 촬영 저장물 색보정 반영은 실기기 QA 잔여.
 
+3. **T3 — Path B: MTKView 라이브 프리뷰 (R2, R3, R4)**
+   - `Features/Camera/CameraPreviewRenderer.swift` 신설 — `NSObject, MTKViewDelegate`. `CIContext(mtlDevice:)` + `MTLCommandQueue`. `enqueue(pixelBuffer:)`(captureOutput 큐, 최신 프레임만 유지, NSLock 보호) / `updatePreset(_:)`(메인) / `draw(in:)`(렌더 스레드에서 락 아래 최신 프레임+프리셋 읽어 동일 `FilterChainBuilder` 체인 적용 → resizeAspectFill 스케일·중앙정렬 → drawable 렌더). Metal 디바이스 nil이면 clearColor(검정)로 graceful(P3).
+   - `CameraViewModel`: `nonisolated(unsafe) let previewRenderer = CameraPreviewRenderer()`. `preset` didSet에서 `updatePreset`(저장 경로와 동일 프리셋 → WYSIWYG). `captureOutput` **최상단**에서 매 프레임 `enqueue`(guidance/추론 성공 여부와 무관하게 항상 → 프리뷰 안 끊김). CoreML 0.5s 스로틀 경로 그대로 분리.
+   - `CameraLiveStepView`/`CameraView`: `CameraPreview`를 `AVCaptureVideoPreviewLayer` UIView → **`MTKView`(30fps 자체 구동, framebufferOnly=false)** 로 교체. `session:` 파라미터를 `previewRenderer:`로 교체. 프리뷰 wrapper도 갱신.
+
+4. **T4 — 오버레이·방향·aspectFill**: grid/FramingGuide/AIDynamicAlignment는 **이미 ZStack에서 프리뷰 위 SwiftUI 레이어**라 자동 유지(별도 재배치 불필요). orientation/aspectFill은 렌더러 `draw`에서 처리(연결 videoOrientation=.portrait 전제).
+
+Build: ✅ BUILD SUCCEEDED / Test: ✅ **43 tests 유지**, 회귀 없음.
+⚠️ **실기기 검증 필수(T5, 사용자 QA)**: ① 프리뷰 상하반전/미러링(back 기준 무플립으로 구현 — 뒤집히면 렌더러 `draw`의 transform에 y-flip 1줄 추가) ② 전면 카메라 미러링 미처리(back이 기본) ③ **≥30fps·발열(thermalState) 게이트**(non-negotiable) ④ WYSIWYG(P2, 프리뷰=저장) ⑤ nil-safe(P3).
+
 ## Next Recommended Tasks
 
-> **다음 세션 시작점(우선): Phase 1 Path B — MTKView 라이브 프리뷰 필터 적용.** 스펙 `GOALS DOCS/filter-application-spec.md` T3~T5. 실기기 성능 게이트(≥30fps) 필수. `AVCaptureVideoPreviewLayer` → `MTKView(CIContext(mtlDevice:))` 교체, `captureOutput` 버퍼에 동일 `FilterChainBuilder` 체인 적용, grid/FramingGuide/AIDynamicAlignment 오버레이·orientation·aspectFill 재배치. CoreML 0.5s 스로틀은 분리 유지.
+> **다음: Phase 1 Path B 실기기 성능/시각 게이트(T5, 사용자 QA)** — 위 ⚠️ 5개 항목. 통과하면 Phase 1 종료.
 >
-> Path B 이후 로드맵: **Phase 2(앨범 그룹핑, 로컬 키스톤)** → Phase 3(별자리 라인) → Phase 4(공유, design-first/백엔드 게이트). 상세는 `GOALS DOCS/lensnote-master-delegation-brief.md`.
+> 그다음 로드맵: **Phase 2(앨범 그룹핑, 로컬 키스톤, build-ready)** → Phase 3(별자리 라인) → Phase 4(공유, design-first/백엔드 게이트). 상세는 `GOALS DOCS/lensnote-master-delegation-brief.md` §6~§8.
 
 1. **레퍼런스 인식 정확도 — ✅ 베이스라인 측정 완료(2026-07-13).** 레퍼런스 23장 투입 → `generateLabelDrafts` → 23장 시각검수 → ground-truth `labels.json` 작성 → `renderLabelPreviews`(신규, GT 박스를 `_previews_gt/`에 렌더) 자기검증 → `scoreAccuracy`.
    - 베이스라인: presence 91.3 · coverage 56.5 · position 73.9 · angle 78.3 · overall **75.0%**. (마스터 브리프 Phase 0)
