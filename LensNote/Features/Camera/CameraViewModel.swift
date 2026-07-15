@@ -23,7 +23,12 @@ final class CameraViewModel: NSObject, ObservableObject {
     @Published var errorMessage: String? = nil
 
     @Published var conceptText: String = ""
-    @Published var preset: FilterPreset? = nil
+    @Published var preset: FilterPreset? = nil {
+        didSet {
+            // Path B — 프리뷰 렌더러에 활성 프리셋을 반영(저장 경로와 동일 프리셋 → WYSIWYG).
+            previewRenderer.updatePreset(preset)
+        }
+    }
     @Published var guidanceMessage: String = "컨셉을 입력하면 구도 안내를 시작해요."
     /// 현재 프레임이 목표 구도에 얼마나 가까운지 표시하는 점수.
     @Published var guidanceScore: Double = 0.0
@@ -73,6 +78,8 @@ final class CameraViewModel: NSObject, ObservableObject {
     private let photoOutput = AVCapturePhotoOutput()
     // Path A(저장 사진 필터 적용)용 재사용 렌더 컨텍스트. GPU 렌더.
     private let filterRenderContext = CIContext(options: [.useSoftwareRenderer: false])
+    // Path B — 라이브 프리뷰(MTKView) 렌더러. captureOutput이 매 프레임 픽셀버퍼를 전달한다.
+    nonisolated(unsafe) let previewRenderer = CameraPreviewRenderer()
     // 카메라 프레임 -> 구도 가이드 결과를 만드는 엔진
     private nonisolated(unsafe) let guidanceEngine = CompositionGuidanceEngine()
     // CoreML 실시간 AI 추론 엔진 (MobileNetV2 + DeepLabV3)
@@ -433,6 +440,14 @@ extension CameraViewModel: AVCaptureVideoDataOutputSampleBufferDelegate {
         didOutput sampleBuffer: CMSampleBuffer,
         from connection: AVCaptureConnection
     ) {
+        let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer)
+
+        // Path B — 매 프레임을 프리뷰 렌더러로 전달(필터 실시간 적용).
+        // guidance/추론 성공 여부와 무관하게 항상 실행해 프리뷰가 끊기지 않게 한다(R2).
+        if let pixelBuffer {
+            previewRenderer.enqueue(pixelBuffer: pixelBuffer)
+        }
+
         // 현재 프레임 시점의 기기 자세를 함께 읽어온다.
         let devicePose = devicePoseProvider.latestPose
         // Vision 기반 feature와 motion 정보를 합쳐 최종 가이드를 만든다.
@@ -445,7 +460,7 @@ extension CameraViewModel: AVCaptureVideoDataOutputSampleBufferDelegate {
         }
 
         // CoreML 실시간 AI 추론 (스케줄러 스로틀링 내장 — 모델 로드 실패 시 nil 반환)
-        guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
+        guard let pixelBuffer else { return }
         if let inferenceOutput = inferenceEngine.analyze(pixelBuffer: pixelBuffer) {
             Task { @MainActor [weak self] in
                 self?.applyInferenceOutput(inferenceOutput)

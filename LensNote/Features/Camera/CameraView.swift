@@ -86,7 +86,7 @@ struct CameraView: View {
             switch step {
             case .camera:
                 CameraLiveStepView(
-                    session: viewModel.session,
+                    previewRenderer: viewModel.previewRenderer,
                     cameraStatusMessage: viewModel.cameraStatusMessage,
                     overlayState: viewModel.overlayState,
                     showGrid: showGrid,
