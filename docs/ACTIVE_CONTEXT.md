@@ -510,9 +510,39 @@ tasks.md task 13(13.1) 체크. Build ✅ / Test ✅ 31.
 - **카메라 품질 평가 하니스(커밋 bc89464, B+C 전략 1단계)**: "좋은 구도"라는 주관 → "레퍼런스 재현 정확도" 측정으로 전환. `EvalAssets/`(레포 루트), `LensNoteTests/ReferenceAccuracyTests`(`generateLabelDrafts`/`scoreAccuracy`, 시뮬레이터가 호스트 경로 직접 읽음), `docs/REFERENCE_EVAL.md`. 자세한 맥락은 메모리 [[camera-quality-eval]].
 - 자동화 테스트 **36개 통과(10 suite)**.
 
+## Completed Work (2026-07-14~15 — Phase 1: 필터 실제 적용, Path A + Path B)
+
+마스터 위임 브리프(`GOALS DOCS/lensnote-master-delegation-brief.md`) 로드맵의 **Phase 1(필터 실제 적용, B)** 구현. 스펙 `GOALS DOCS/filter-application-spec.md`의 **Path A(저장 사진 적용) + Path B(MTKView 라이브 프리뷰)** 코드 완료. 하나의 `dev→main` PR로 묶음(사용자 결정). 실기기 성능/시각 게이트(T5)는 사용자 QA 잔여.
+
+1. **T1 — FilterPreset 도메인 승격 + FilterChainBuilder**
+   - `FilterPreset`(struct + `.standard` + `forConcept`)을 `CameraViewModel.swift` → `Domain/Entities/FilterPreset.swift`로 이동. 같은 모듈이라 참조부 변경 불필요. `isNeutral`(전부 0) computed 추가(no-op 판정).
+   - `Features/Camera/FilterChainBuilder.swift` 신설 — 순수 `enum`. `makeChain(from:) -> (CIImage) -> CIImage`. 체인: Exposure→TemperatureAndTint→ColorControls(contrast+saturation)→Vignette, 마지막에 원본 extent로 크롭. 중립 프리셋이면 항등 함수 반환(R5).
+   - **캘리브레이션 상수**: evScale 2.0 / temperatureScale 3000 / vignetteScale 1.5 / neutral 6500K.
+   - ⚠️ **temperature 부호 교정**: 스펙 §5.1 초안은 `targetNeutral = 6500 + temp*k`(양수=따뜻)였으나 `CITemperatureAndTint`는 targetNeutral 색온도를 **올리면 오히려 차가워짐**(보정 방향 반대). → `6500 - temp*scale`로 뒤집어 양수=따뜻 확정. 테스트로 검증.
+   - `LensNoteTests/FilterChainBuilderTests` 6건: no-op(P1)/isNeutral/exposure 밝기↑/saturation spread↑/contrast 밝은픽셀↑/temperature 따뜻(R-B)↑. 단색 CIImage 렌더 후 픽셀 샘플링 방식.
+
+2. **T2 — Path A: 저장 사진에 실제 적용 (R1, R5)**
+   - `CameraViewModel`에 `import CoreImage` + 재사용 `filterRenderContext = CIContext(useSoftwareRenderer:false)`.
+   - `renderedImageApplyingPreset(to:)` 헬퍼: preset nil/중립이면 원본 통과, 아니면 UIImage → CGImage → `CIImage.oriented`(imageOrientation 픽셀에 굽기) → 체인 → `createCGImage` → `UIImage(.up)`. 렌더 실패 시 원본 fallback(크래시 금지). `cgOrientation(from:)` 매핑 헬퍼 추가.
+   - `saveCapturedImage`가 저장 파일·결과 카드 썸네일 **둘 다** `outputImage`(필터 적용본) 사용 → WYSIWYG(R3).
+
+Build: ✅ BUILD SUCCEEDED / Test: ✅ **43 tests / 11 suites 통과**(기존 37 +6), 회귀 없음. 시뮬레이터 카메라 피드 없음 → 실제 촬영 저장물 색보정 반영은 실기기 QA 잔여.
+
+3. **T3 — Path B: MTKView 라이브 프리뷰 (R2, R3, R4)**
+   - `Features/Camera/CameraPreviewRenderer.swift` 신설 — `NSObject, MTKViewDelegate`. `CIContext(mtlDevice:)` + `MTLCommandQueue`. `enqueue(pixelBuffer:)`(captureOutput 큐, 최신 프레임만 유지, NSLock 보호) / `updatePreset(_:)`(메인) / `draw(in:)`(렌더 스레드에서 락 아래 최신 프레임+프리셋 읽어 동일 `FilterChainBuilder` 체인 적용 → resizeAspectFill 스케일·중앙정렬 → drawable 렌더). Metal 디바이스 nil이면 clearColor(검정)로 graceful(P3).
+   - `CameraViewModel`: `nonisolated(unsafe) let previewRenderer = CameraPreviewRenderer()`. `preset` didSet에서 `updatePreset`(저장 경로와 동일 프리셋 → WYSIWYG). `captureOutput` **최상단**에서 매 프레임 `enqueue`(guidance/추론 성공 여부와 무관하게 항상 → 프리뷰 안 끊김). CoreML 0.5s 스로틀 경로 그대로 분리.
+   - `CameraLiveStepView`/`CameraView`: `CameraPreview`를 `AVCaptureVideoPreviewLayer` UIView → **`MTKView`(30fps 자체 구동, framebufferOnly=false)** 로 교체. `session:` 파라미터를 `previewRenderer:`로 교체. 프리뷰 wrapper도 갱신.
+
+4. **T4 — 오버레이·방향·aspectFill**: grid/FramingGuide/AIDynamicAlignment는 **이미 ZStack에서 프리뷰 위 SwiftUI 레이어**라 자동 유지(별도 재배치 불필요). orientation/aspectFill은 렌더러 `draw`에서 처리(연결 videoOrientation=.portrait 전제).
+
+Build: ✅ BUILD SUCCEEDED / Test: ✅ **43 tests 유지**, 회귀 없음.
+⚠️ **실기기 검증 필수(T5, 사용자 QA)**: ① 프리뷰 상하반전/미러링(back 기준 무플립으로 구현 — 뒤집히면 렌더러 `draw`의 transform에 y-flip 1줄 추가) ② 전면 카메라 미러링 미처리(back이 기본) ③ **≥30fps·발열(thermalState) 게이트**(non-negotiable) ④ WYSIWYG(P2, 프리뷰=저장) ⑤ nil-safe(P3).
+
 ## Next Recommended Tasks
 
-> **다음 세션 시작점(우선): 카메라 구도 코칭 품질 측정·튜닝(B+C 전략).** 상세 맥락은 메모리 `camera-quality-eval.md` + `docs/REFERENCE_EVAL.md`.
+> **다음: Phase 1 Path B 실기기 성능/시각 게이트(T5, 사용자 QA)** — 위 ⚠️ 5개 항목. 통과하면 Phase 1 종료.
+>
+> 그다음 로드맵: **Phase 2(앨범 그룹핑, 로컬 키스톤, build-ready)** → Phase 3(별자리 라인) → Phase 4(공유, design-first/백엔드 게이트). 상세는 `GOALS DOCS/lensnote-master-delegation-brief.md` §6~§8.
 
 1. **레퍼런스 인식 정확도 — ✅ 베이스라인 측정 완료(2026-07-13).** 레퍼런스 23장 투입 → `generateLabelDrafts` → 23장 시각검수 → ground-truth `labels.json` 작성 → `renderLabelPreviews`(신규, GT 박스를 `_previews_gt/`에 렌더) 자기검증 → `scoreAccuracy`.
    - 베이스라인: presence 91.3 · coverage 56.5 · position 73.9 · angle 78.3 · overall **75.0%**. (마스터 브리프 Phase 0)
@@ -526,9 +556,17 @@ tasks.md task 13(13.1) 체크. Build ✅ / Test ✅ 31.
    - **현재: presence 100 · coverage 69.6 · position 95.7 · angle 95.7 · overall 90.2%.** 37 테스트 통과, 회귀 없음.
    - **남은 것(우선순위 낮음)**: coverage 잔여 7건(박스-GT 자연 변동, IoU는 대부분 통과) / position 022(1건, 노이즈) / angle 023(진짜 highAngle, 얼굴 pitch 경로 필요·리스크). 깊은 제품 레버 = 라이브 코칭 coverage 일관성(실기기 검증 대상).
    - ⚠️ swift-testing은 `-only-testing`에 스위트(`LensNoteTests/ReferenceAccuracyTests`) 단위로 지정해야 실행됨(개별 @Test 함수 지정 시 0개 실행).
-2. (보류) 데모 준비 / 신규 백로그(필터 추천 고도화) / 실기기 정밀 검증(Req 10.1/10.2).
+   - ✅ **PR #5로 main 반영 완료** (merge commit `e9917ac`, overall 90.2%). angle 축은 여기서 종료(023은 pitch 경로 필요, 값싼 튜닝 불가).
+2. (보류) 데모 준비 / 신규 백로그(필터 추천 고도화, **줌/화각 재현 코칭** 신규 추가) / 실기기 정밀 검증(Req 10.1/10.2).
 
-> ⚠️ **라이브 코칭 한계**: 라이브 경로엔 face landmark가 없어 `cameraAngle`은 항상 nil → 현재 coverage 코칭만 실제 동작. angle 코칭 활성화는 라이브 프레임 사람 검출/앵글 추정 구현 필요(Req 10 pitch 연동). 평가에서 angle 축이 낮게 나오는 것과 직결.
+## 브랜치 워크플로우 (2026-07-13 변경)
+
+- **main-only → `dev` 작업 + `dev→main` PR**("적당히 기능 모이면"). **앞으로 모든 작업은 `dev`에서.**
+- 현재: `main`=e9917ac(origin 동기화, PR #5 머지됨) / `dev`=d00e10b(main 포함 + 백로그 docs 커밋 1개 앞섬, ff 가능). 다음 작업이 dev에 쌓이고 다음 PR에 백로그 커밋도 실림.
+- **PR 규칙**: PR = 테마("하나의 이야기") 단위(커밋보다 굵게, 테마 안 섞음). 안정 체크포인트에서 컷. 머지 = **merge commit**(squash 아님, 논리커밋 히스토리 보존) → 머지 후 dev를 main 위로 rebase 정렬.
+- ⚠️ **PR 생성 전 반드시 `git push`** — PR은 origin/dev 상태를 담음(이번에 백로그 커밋이 push 전 PR 생성으로 누락됨, 사후 rebase로 복구).
+
+> ⚠️ **라이브 코칭 한계**: 라이브 경로엔 face landmark가 없어 `cameraAngle`은 항상 nil → 현재 coverage 코칭만 실제 동작. angle 코칭 활성화는 라이브 프레임 사람 검출/앵글 추정 구현 필요(Req 10 pitch 연동). 평가에서 angle 축이 낮게 나오는 것과 직결. **줌/화각 재현 코칭(백로그)도 라이브 화각 추정 필요 — 같은 실기기 검증 계열.**
 > 위임 원칙(사용자 확인): UI/UX 최종 판단은 사용자, Claude는 시안·구현·반복. 모호한 기능은 "예시+체크가능한 성공기준"으로 위임. 상세 [[camera-quality-eval]].
 
 ## Verification Status

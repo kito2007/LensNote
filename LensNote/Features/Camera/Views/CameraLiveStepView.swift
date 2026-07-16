@@ -7,9 +7,11 @@
 
 import SwiftUI
 import AVFoundation
+import MetalKit
 
 struct CameraLiveStepView: View {
-    let session: AVCaptureSession
+    /// 라이브 프리뷰(MTKView)를 구동하는 렌더러. 활성 프리셋의 색보정을 실시간 적용한다(Path B).
+    let previewRenderer: CameraPreviewRenderer
     let cameraStatusMessage: String?
     let overlayState: GuidanceOverlayState?
     let showGrid: Bool
@@ -44,7 +46,7 @@ struct CameraLiveStepView: View {
     var body: some View {
         ZStack {
             // MARK: - Camera feed
-            CameraPreview(session: session)
+            CameraPreview(renderer: previewRenderer)
                 .ignoresSafeArea()
 
             // Glass overlay for depth — stitch ref: from-black/20 via-transparent to-black/40
@@ -613,33 +615,25 @@ private struct FramingGuideOverlay: View {
 
 // MARK: - Camera Preview
 
+/// MTKView 기반 라이브 프리뷰. captureOutput 프레임에 활성 프리셋 색보정을 실시간 적용한다(Path B).
+/// 렌더 로직은 `CameraPreviewRenderer`(MTKViewDelegate)가 담당.
 private struct CameraPreview: UIViewRepresentable {
-    let session: AVCaptureSession
+    let renderer: CameraPreviewRenderer
 
-    func makeUIView(context: Context) -> UIView {
-        let view = PreviewView()
-        view.previewLayer.videoGravity = .resizeAspectFill
-        view.previewLayer.session = session
+    func makeUIView(context: Context) -> MTKView {
+        let view = MTKView(frame: .zero, device: renderer.device)
+        view.delegate = renderer
+        view.framebufferOnly = false          // CIContext가 drawable 텍스처에 렌더하려면 필요.
+        view.colorPixelFormat = .bgra8Unorm
+        view.preferredFramesPerSecond = 30     // display ↔ capture 분리, R4 목표 fps.
+        view.enableSetNeedsDisplay = false
+        view.isPaused = false                  // 자체 타이머로 구동, 최신 프레임을 draw에서 소비.
+        view.clearColor = MTLClearColor(red: 0, green: 0, blue: 0, alpha: 1)
+        view.contentMode = .scaleAspectFill
         return view
     }
 
-    func updateUIView(_ uiView: UIView, context: Context) {
-        guard let view = uiView as? PreviewView else { return }
-        if view.previewLayer.session !== session {
-            view.previewLayer.session = session
-        }
-    }
-
-    final class PreviewView: UIView {
-        override class var layerClass: AnyClass { AVCaptureVideoPreviewLayer.self }
-
-        var previewLayer: AVCaptureVideoPreviewLayer {
-            guard let layer = self.layer as? AVCaptureVideoPreviewLayer else {
-                return AVCaptureVideoPreviewLayer()
-            }
-            return layer
-        }
-    }
+    func updateUIView(_ uiView: MTKView, context: Context) {}
 }
 
 // MARK: - Previews
@@ -671,7 +665,7 @@ private struct CameraLiveStepPreviewWrapper: View {
 
     var body: some View {
         CameraLiveStepView(
-            session: AVCaptureSession(),
+            previewRenderer: CameraPreviewRenderer(),
             cameraStatusMessage: cameraStatusMessage,
             overlayState: overlayState,
             showGrid: showGrid,

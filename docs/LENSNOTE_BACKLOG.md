@@ -53,6 +53,12 @@
   Done: `Features/Map/Views/` 서브뷰 분리(PinAnnotation/Cluster/SidePanel/PinCard/PermissionOverlay/EmptyState/Loading) + MapRegionFilter 추출. (Kiro Req 7, 2026-06-02)
 - [ ] Add stronger error and permission recovery messaging.
 - [ ] Expand simulator QA scenarios for home, camera, and map flows.
+- [ ] **줌/화각 재현 코칭 (추후 개발, 2026-07-13 결정)**
+  Why: 레퍼런스 재현의 4번째 축. coverage("더 가까이/멀리")는 피사체 *크기*만 맞추고, 다가가기 vs 줌인은 같은 크기라도 원근감(광각 왜곡 vs 망원 압축)이 달라 "느낌"이 재현 안 됨. focal length는 EXIF ground truth라 측정 가능(B전략 적합).
+  현재 상태: 레퍼런스 `focalLength35mm`은 EXIF에서 읽어 SHOT RECIPE 카드 표시 + ShotStyle 분류에만 사용. 라이브 코칭(`LiveCoachingEngine`)은 coverage+angle만 비교, focal 미사용. 라이브 프레임 `focalLength35mm=nil`(CameraViewModel:500). 카메라는 `builtInWideAngleCamera` 단일 렌즈(울트라와이드/줌 제어 없음).
+  Scope (2단계): **A. 줌 코칭(안내)** — 라이브 `videoZoomFactor`로 현재 화각 추정 → 레퍼런스 focal과 비교 → "더 넓게(0.5x)"/"줌 당기기" 텍스트. 기존 coverage/angle 코칭 패턴 재사용. **B. 줌 자동 제어** — `videoZoomFactor` 세팅 / 울트라와이드 자동 전환(`builtInTripleCamera` 등). A로 체감 확인 후 B.
+  성공 기준: 레퍼런스 focal 대비 라이브 화각이 임계 이상 벗어나면 방향 정확한 문구 노출(레퍼런스 재현 정확도 하니스에 focal 축 추가로 측정). 실기기 검증 필수(시뮬레이터 줌/렌즈 불가).
+  Note: 023(하이앵글 광각 쪼그림샷)에서 떠오른 아이디어지만, 023의 angle=highAngle 오분류는 별개(얼굴 pitch 경로 필요)라 줌 코칭으로는 안 고쳐짐.
 
 ## Milestone 3: Demo Readiness And Polish
 
