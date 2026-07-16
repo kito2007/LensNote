@@ -538,9 +538,20 @@ Build: ✅ BUILD SUCCEEDED / Test: ✅ **43 tests / 11 suites 통과**(기존 37
 Build: ✅ BUILD SUCCEEDED / Test: ✅ **43 tests 유지**, 회귀 없음.
 ⚠️ **실기기 검증 필수(T5, 사용자 QA)**: ① 프리뷰 상하반전/미러링(back 기준 무플립으로 구현 — 뒤집히면 렌더러 `draw`의 transform에 y-flip 1줄 추가) ② 전면 카메라 미러링 미처리(back이 기본) ③ **≥30fps·발열(thermalState) 게이트**(non-negotiable) ④ WYSIWYG(P2, 프리뷰=저장) ⑤ nil-safe(P3).
 
+## Completed Work (2026-07-16 — 카메라 라이브 뷰 대폭 축소, 미니멀 재현 UI)
+
+실기기 스크린샷 리뷰 결과 "정보 과부하"(구도 가이드 3중 오버레이 + 죽은 버튼 + 가짜 칩). 앱 정체성("레퍼런스와 같은 톤·구도로 찍기")에 **직접 기여하는 요소만** 남기기로(사용자 결정).
+
+- **CameraLiveStepView 미니멀 재작성** — 남긴 것: 라이브 프리뷰(필터 적용) · 🏠홈 · 레퍼런스(썸네일/교체, 없으면 점선원 CTA + 하단 온보딩 힌트) · 코칭 한 줄 · 셔터. **제거**: AI 분석 칩 3개(FILTER/ISO/SCORE), 그리드 토글(#)+`GridOverlayView`, `AIDynamicAlignmentOverlay`(파란 점선 원), `FramingGuideOverlay` 전체(목표/감지 박스·배지·화살표·손 심볼), 매직 버튼(no-op), 사이드 맵/갤러리 버튼.
+- **CameraView 축소** — `CameraSetupSheet`에서 `.concept`/`.manual` 삭제(레퍼런스만). conceptInput·manual* 5개·showGrid·showGalleryPicker state 제거. 호출부 새 API(8→minimal). `CameraConceptStepView.swift`/`CameraManualStepView.swift` **파일 삭제**.
+- **누끼 고스트 오버레이 슬롯 예약**: 오버레이를 전부 비운 이유 = 레퍼런스 인물 누끼(DeepLabV3 person 마스크 활용)를 반투명으로 프리뷰에 얹어 구도를 시각적으로 맞추는 기능을 넣을 자리 확보. CameraLiveStepView ZStack에 주석 슬롯. **사용자 고민 중 → 미구현**.
+
+Build ✅ / Test ✅ 43 tests, 회귀 없음. ⚠️ 라이브 뷰 시각은 실기기에서만 확인(카메라 피드 없음). 이 변경은 PR #6(dev) 위에 얹힘.
+
 ## Next Recommended Tasks
 
-> **다음: Phase 1 Path B 실기기 성능/시각 게이트(T5, 사용자 QA)** — 위 ⚠️ 5개 항목. 통과하면 Phase 1 종료.
+> **① 카메라 UI 실기기 확인 + Phase 1 Path B 게이트** — 미니멀 뷰 실기기 체감(레퍼런스 CTA→선택→톤 적용→코칭→셔터) + Path B 성능/방향/WYSIWYG. 통과하면 Phase 1 종료.
+> **② (사용자 결정 대기) 레퍼런스 누끼 고스트 오버레이** — 레퍼런스 인물 누끼를 프리뷰에 반투명 오버레이해 구도 재현. 재료(DeepLabV3 person 마스크) 보유. 결정되면 예약 슬롯에 구현.
 >
 > 그다음 로드맵: **Phase 2(앨범 그룹핑, 로컬 키스톤, build-ready)** → Phase 3(별자리 라인) → Phase 4(공유, design-first/백엔드 게이트). 상세는 `GOALS DOCS/lensnote-master-delegation-brief.md` §6~§8.
 

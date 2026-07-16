@@ -10,17 +10,15 @@ import PhotosUI
 import UIKit
 
 /// 카메라 플로우 단계 상태. Req 12 — 진입 즉시 라이브 뷰(`camera`), 촬영 후 결과(`result`)만 남긴다.
-/// 레퍼런스/컨셉/수동 설정은 라이브 뷰 위 시트(`CameraSetupSheet`)로 전환됐다.
 private enum CameraInputMode: String {
     case camera
     case result
 }
 
-/// 라이브 뷰에서 인라인으로 여는 셋업 시트 종류 (Req 12).
+/// 라이브 뷰에서 인라인으로 여는 셋업 시트 종류.
+/// 미니멀 재현 UI로 축소하며 컨셉/수동은 제거, 레퍼런스만 남긴다(앱의 출발점).
 private enum CameraSetupSheet: String, Identifiable {
     case reference
-    case concept
-    case manual
     var id: String { rawValue }
 }
 
@@ -46,26 +44,16 @@ struct CameraView: View {
 
     @State private var step: CameraInputMode = .camera
     @State private var activeSetupSheet: CameraSetupSheet? = nil
-    /// 갤러리 사이드 버튼으로 직접 띄우는 사진 피커 표시 여부 (Req 3.2).
-    @State private var showGalleryPicker: Bool = false
-    @State private var conceptInput: String = ""
     @State private var referencePickerItem: PhotosPickerItem?
     @State private var selectedReferenceImage: UIImage?
     @State private var capturedImage: UIImage?
-    
-    @State private var manualExposure: Double = 0.0
-    @State private var manualContrast: Double = 0.0
-    @State private var manualSaturation: Double = 0.0
-    @State private var manualTemperature: Double = 0.0
-    @State private var manualVignette: Double = 0.0
-    
+
     @State private var referenceAnalysisStage: ReferenceAnalysisStage = .idle
     @State private var referenceGeneratedPreset: FilterPreset? = nil
     @State private var referenceImageData: Data? = nil
     @State private var referenceGeneratedRecipe: ShotRecipe? = nil
     /// 진행 중인 레퍼런스 분석 Task. 뒤로가기 시 취소한다 (Req 10.5).
     @State private var referenceAnalysisTask: Task<Void, Never>? = nil
-    @State private var showGrid: Bool = true
 
     private let assistService: CameraAssistServiceProtocol = CoreMLCameraAssistService()
     
@@ -88,21 +76,10 @@ struct CameraView: View {
                 CameraLiveStepView(
                     previewRenderer: viewModel.previewRenderer,
                     cameraStatusMessage: viewModel.cameraStatusMessage,
-                    overlayState: viewModel.overlayState,
-                    showGrid: showGrid,
-                    conceptText: viewModel.conceptText,
-                    guidanceMessage: viewModel.guidanceMessage,
-                    guidanceScore: viewModel.guidanceScore,
-                    readyToCapture: viewModel.readyToCapture,
                     isCapturingPhoto: viewModel.isCapturingPhoto,
-                    recommendation: assistService.recommendation(from: viewModel.preset, concept: viewModel.conceptText),
-                    tips: assistService.compositionTips(concept: viewModel.conceptText, guidance: viewModel.guidanceMessage),
-                    sceneLabel: viewModel.sceneLabel,
-                    inferenceScore: viewModel.inferenceScore,
                     activeGuidanceHint: viewModel.activeGuidanceHint,
                     referenceImage: selectedReferenceImage,
                     onExit: onExit,
-                    onToggleGrid: { showGrid.toggle() },
                     onCapture: {
                         Task {
                             if let image = await viewModel.capturePhoto() {
@@ -113,11 +90,7 @@ struct CameraView: View {
                             }
                         }
                     },
-                    onTapReference: { activeSetupSheet = .reference },
-                    onTapConcept: { activeSetupSheet = .concept },
-                    onTapManual: { activeSetupSheet = .manual },
-                    onMapTap: onOpenMap,
-                    onGalleryTap: { showGalleryPicker = true }
+                    onTapReference: { activeSetupSheet = .reference }
                 )
             case .result:
                 CameraCaptureResultStepView(
@@ -169,12 +142,10 @@ struct CameraView: View {
         }
         .onChange(of: referencePickerItem) { _, newItem in
             guard let newItem else { return }
-            // 갤러리 사이드 버튼으로 고른 경우(시트 미오픈) 레퍼런스 시트를 열어 분석을 보여준다 (Req 3.3).
+            // 레퍼런스 시트 밖에서 선택된 경우에도 시트를 열어 분석을 보여준다.
             if activeSetupSheet == nil { activeSetupSheet = .reference }
             Task { await loadReferenceImage(from: newItem) }
         }
-        // Req 3.2 — 갤러리 사이드 버튼: 시스템 사진 피커(PHPicker)를 직접 표시. 취소 시 라이브 뷰 유지(Req 3.4).
-        .photosPicker(isPresented: $showGalleryPicker, selection: $referencePickerItem, matching: .images)
         .sheet(item: $activeSetupSheet) { sheet in
             setupSheet(sheet)
         }
@@ -185,7 +156,7 @@ struct CameraView: View {
         }
     }
 
-    /// 라이브 뷰 위에 인라인으로 띄우는 셋업 시트. 적용/취소 후 시트를 닫고 라이브 뷰로 돌아온다(Req 12).
+    /// 라이브 뷰 위에 인라인으로 띄우는 레퍼런스 선택/분석 시트. 적용/취소 후 라이브 뷰로 돌아온다.
     @ViewBuilder
     private func setupSheet(_ sheet: CameraSetupSheet) -> some View {
         switch sheet {
@@ -205,41 +176,6 @@ struct CameraView: View {
                     viewModel.setReferenceRecipe(referenceGeneratedRecipe)
                     activeSetupSheet = nil
                 }
-            )
-        case .concept:
-            CameraConceptStepView(
-                conceptInput: $conceptInput,
-                onBack: { activeSetupSheet = nil },
-                onStartCamera: {
-                    viewModel.conceptText = conceptInput
-                    viewModel.applyConcept()
-                    // 컨셉 적용 — 레퍼런스 코칭 비활성화.
-                    viewModel.setReferenceRecipe(nil)
-                    activeSetupSheet = nil
-                }
-            )
-        case .manual:
-            CameraManualStepView(
-                onBack: { activeSetupSheet = nil },
-                onStartCamera: {
-                    viewModel.conceptText = "Manual"
-                    viewModel.preset = FilterPreset(
-                        name: "Manual",
-                        exposure: manualExposure,
-                        contrast: manualContrast,
-                        saturation: manualSaturation,
-                        temperature: manualTemperature,
-                        vignette: manualVignette
-                    )
-                    // 수동 적용 — 레퍼런스 코칭 비활성화.
-                    viewModel.setReferenceRecipe(nil)
-                    activeSetupSheet = nil
-                },
-                manualExposure: $manualExposure,
-                manualContrast: $manualContrast,
-                manualSaturation: $manualSaturation,
-                manualTemperature: $manualTemperature,
-                manualVignette: $manualVignette
             )
         }
     }
