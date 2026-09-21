@@ -13,3 +13,7 @@ build/
 # XcodeBuildMCP local artifacts
 .xcodebuildmcp/DerivedData/
 .xcodebuildmcp/artifacts/
+
+# 내부 작업 문서 (공개 리포에서 제외)
+docs/ACTIVE_CONTEXT.md
+docs/LENSNOTE_BACKLOG.md

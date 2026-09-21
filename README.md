@@ -2,7 +2,7 @@
 
 **카메라가 구도를 봐주고, 지도가 기억을 정리해주는 SwiftUI 사진 앱**
 
-LensNote는 단순한 사진 유틸리티가 아니라 *카메라 어시스턴트* + *장소 기반 메모리 브라우저* 컨셉으로 만든 iOS 포트폴리오 프로젝트입니다.
+LensNote는 단순한 사진 유틸리티가 아니라 *카메라 어시스턴트* + *장소 기반 메모리 브라우저* 컨셉의 iOS 앱입니다.
 실시간으로 장면을 분석해 구도 가이드를 띄우고, 촬영된 사진은 그리드가 아닌 **지도 핀**으로 다시 만나도록 설계했습니다.
 
 - **SwiftUI** 기반의 카메라/지도/홈 화면
@@ -59,7 +59,7 @@ LensNote는 단순한 사진 유틸리티가 아니라 *카메라 어시스턴�
 
 ---
 
-## 어필 포인트 (포트폴리오 관점)
+## 설계 포인트
 
 | 포인트 | 구현 위치 |
 | --- | --- |
@@ -133,13 +133,10 @@ open LensNote.xcodeproj
 1. iPhone 17 Pro Simulator(iOS 26.4)에서 빌드 검증되어 있습니다.
 2. 카메라/위치 권한이 필요합니다(`NSCameraUsageDescription`, `NSLocationWhenInUseUsageDescription`, `NSPhotoLibraryUsageDescription`).
 3. `MobileNetV2.mlmodel`, `DeepLabV3.mlmodel`은 저장소 루트에 포함되어 있고 Xcode 타겟에 멤버로 포함되어 있어야 합니다.
-4. 시뮬레이터 자동화는 XcodeBuildMCP 기반으로 `.xcodebuildmcp/config.yaml`에 디폴트가 정의되어 있습니다.
 
 ---
 
 ## 문서
 
-- [`docs/LENSNOTE_PRODUCT_GOAL.md`](docs/LENSNOTE_PRODUCT_GOAL.md) — 최종 제품 목표
-- [`docs/LENSNOTE_BACKLOG.md`](docs/LENSNOTE_BACKLOG.md) — 우선순위 백로그
-- [`docs/ACTIVE_CONTEXT.md`](docs/ACTIVE_CONTEXT.md) — 현재 핸드오프 상태와 다음 작업
-- [`CLAUDE.md`](CLAUDE.md) — Claude Code 협업 가이드 (MVVM 규칙, 위임 정책)
+- [`docs/LENSNOTE_PRODUCT_GOAL.md`](docs/LENSNOTE_PRODUCT_GOAL.md) — 제품 목표
+- [`CLAUDE.md`](CLAUDE.md) — AI 코딩 도구(Claude Code) 사용 규칙. 설계·구현·리뷰에 AI를 활용하되, 아키텍처 규칙(MVVM 레이어 경계)을 이 파일로 강제합니다.
